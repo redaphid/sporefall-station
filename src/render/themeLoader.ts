@@ -16,15 +16,20 @@ import {
   ITEM_IDS,
   isValidThemeId,
   PROP_NAMES,
+  HELD_WEAPON_IDS,
   resolveMacroTiles,
   resolveSpritePaths,
+  resolveWeaponPoints,
+  WEAPON_STATES,
+  WEAPON_VIEWS,
   TILE_NAMES,
   WALL_CAP_NAMES,
   validateManifest,
   type LoadedTheme,
   type ThemeChain,
 } from './theme'
-import { CHAR_PX, TILE_PX, type CharSet, type DirPose, type SpriteTextures, type WallCapTextures } from './art'
+import { CHAR_PX, TILE_PX, type CharSet, type DirPose, type FistBox, type HeldWeaponArt, type SpriteTextures, type WallCapTextures } from './art'
+import { HAND_ANCHORS } from './handAnchors'
 import { ANIM_STATES, MAX_ANIM_FRAMES, type AnimStateName } from './animState'
 
 const BASE = import.meta.env.BASE_URL
@@ -84,6 +89,23 @@ export const fetchTheme = async (id: string): Promise<LoadedTheme | undefined> =
   }
 }
 
+/** Load a held-weapon frame UNSCALED: its pixels are authored on the pack's
+ * character grid, so the texture keeps every texel (nearest filtering) and only
+ * declares that grid as its density, making one weapon texel exactly one
+ * character texel on screen. */
+const bakeNative = async (url: string, density: number): Promise<Texture | undefined> => {
+  try {
+    const src: Texture = await Assets.load(url)
+    const source = src.source
+    source.resolution = density
+    source.scaleMode = 'nearest'
+    return new Texture({ source })
+  } catch (err) {
+    console.warn(`[theme] failed to load ${url}; that weapon frame is not drawn`, err)
+    return undefined
+  }
+}
+
 /** Build the resolution chain for a theme id: [active, swampspace-base]
  * (swampspace alone when it IS the active theme; possibly shorter when a fetch
  * fails). The default hi-res pack thus resolves as [swampspace-hires,
@@ -127,9 +149,21 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
   // bake; the base pack in the chain is only a fallback for missing keys.
   const artScale = chain[0]?.manifest.artScale ?? 1
   const urls = (key: string): string[] | undefined => resolveSpritePaths(key, chain)?.map((p) => BASE + p)
+  // The pixel grid of the pack a path comes from (a base-pack frame in the
+  // hi-res chain is 48px art even though it is baked at the chain's density).
+  const gridOf = (path: string): number => chain.find((t) => path.startsWith(t.dir))?.manifest.artScale ?? 1
+  // Measured fists (handAnchors.ts) of the character frames, in logical units.
+  const fists = new Map<Texture, FistBox>()
   const one = async (key: string, size: number): Promise<Texture | undefined> => {
-    const u = urls(key)
-    return u && u.length > 0 ? bake(renderer, u[0], size, artScale) : undefined
+    const paths = resolveSpritePaths(key, chain)
+    if (!paths || paths.length === 0) return undefined
+    const tex = await bake(renderer, BASE + paths[0], size, artScale)
+    const a = HAND_ANCHORS[paths[0].replace(/^themes\//, '')]
+    if (tex && a) {
+      const g = gridOf(paths[0])
+      fists.set(tex, { x0: a[0] / g, y0: a[1] / g, x1: a[2] / g, y1: a[3] / g, gx: a[4] / g, gy: a[5] / g })
+    }
+    return tex
   }
   const many = async (key: string, size: number): Promise<Texture[]> => {
     const u = urls(key) ?? []
@@ -211,12 +245,51 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
     return out
   }
 
+  // Held weapons: per id, per view, the idle loop and the attack one-shot.
+  const weaponClip = async (key: string): Promise<Texture[]> => {
+    const frames: Texture[] = []
+    for (let n = 0; n < MAX_ANIM_FRAMES; n++) {
+      const paths = resolveSpritePaths(`${key}-${n}`, chain)
+      if (!paths || paths.length === 0) break
+      const tex = await bakeNative(BASE + paths[0], gridOf(paths[0]))
+      if (!tex) break
+      frames.push(tex)
+    }
+    return frames
+  }
+  const heldWeapons = async (): Promise<Record<string, HeldWeaponArt>> => {
+    const out: Record<string, HeldWeaponArt> = {}
+    await Promise.all(
+      HELD_WEAPON_IDS.map(async (id) => {
+        const art: HeldWeaponArt = {}
+        await Promise.all(
+          WEAPON_VIEWS.map(async (v) => {
+            const [idle, attack] = await Promise.all(WEAPON_STATES.map((s) => weaponClip(`weapon.${id}.${v}-${s}`)))
+            if (idle.length === 0) return // a view is drawn only with its idle loop
+            const pts = resolveWeaponPoints(id, v, chain)
+            if (!pts) console.warn(`[theme] weapon.${id}.${v} has frames but no grip in the manifest; using its centre`)
+            const w = idle[0].source.pixelWidth
+            const h = idle[0].source.pixelHeight
+            art[v] = {
+              idle,
+              attack,
+              grip: pts?.grip ?? [Math.floor(w / 2), Math.floor(h / 2)],
+              muzzle: pts?.muzzle ?? pts?.grip ?? [w - 1, Math.floor(h / 2)],
+            }
+          }),
+        )
+        if (Object.keys(art).length > 0) out[id] = art
+      }),
+    )
+    return out
+  }
+
   const [
     tiles, tileAccents, tileOverlays, tileCaps, player, warden, item, prop,
     mutant, scientist, robot, mutantStep, scientistStep, robotStep,
     projectile, grenade,
     flames, hit, explosion, pickup, blood,
-    charSets, items, props,
+    charSets, items, props, weapons,
   ] = await Promise.all([
     tilePools(''), tilePools('.accent'), tilePools('.overlay'), tileCapPairs(),
     one('unit.player', CHAR_CANVAS_PX), one('unit.warden', CHAR_CANVAS_PX),
@@ -232,6 +305,7 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
     Promise.all(CHAR_NAMES.map((n) => charSet(n))),
     record(ITEM_IDS, ITEM_PX, 'item'),
     record(PROP_NAMES, TILE_PX, 'prop'),
+    heldWeapons(),
   ])
 
   const chars: Record<string, CharSet> = {}
@@ -245,5 +319,6 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
     mutant, scientist, robot, mutantStep, scientistStep, robotStep,
     projectile, grenade,
     flames, hit, explosion, pickup, blood, chars, charKinds: charArtKinds(chain), items, props,
+    weapons, fists, artScale,
   }
 }

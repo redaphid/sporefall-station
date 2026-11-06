@@ -239,8 +239,8 @@ pointing along the facing. Draw `aim` as a 1-2 frame breathing hold
 (`…-aim-0`, `…-aim-1`) and `aimwalk` as 8 frames with the same stride timing as
 `walk`, so the cut between them keeps the feet. The two are independent: a
 pack with only `aimwalk` stands in `idle`, one with only `aim` walks in `walk`.
-Without aim frames the held weapon sprite rises from the hip to a raised hold
-at chest height, an arm's length out along the aim. Co-op clients get the
+Without aim frames the held weapon (pack art only, see "Held weapons") stays in
+the fist the body frame draws, level or at low-ready by that section's rule. Co-op clients get the
 host's verdict in the snapshot (an aim trailer), so they show the same states.
 
 **Drawn-only states (`draw`, `fidget`, `aim`, `aimwalk`).** These exist only as art. A pack that
@@ -350,6 +350,46 @@ frames), the procedural twin steps aside: a drawn walk or idle loop drops the
 bob, breath, hover or pulse cycle; a drawn `death` keeps the fade (over its last
 18 ticks) but not the topple; a drawn `attack` keeps 30% of the lunge. Tuning lives in
 `src/render/motion.ts` (`MOTION` table).
+
+### Held weapons (`weapon.<id>.<view>-<state>-<n>` + `weapons`)
+
+A character holding a carried weapon (pistol, wrench, knife, sledgehammer, the
+guns; never natural armament like fangs or claws) draws it from the pack. **A
+weapon no pack in the chain draws is not drawn at all**: there is no
+procedural stand-in.
+
+- **Keys.** `weapon.<id>.<view>-idle-<n>` (a loop while held) and
+  `weapon.<id>.<view>-attack-<n>` (a one-shot spread evenly over the attack
+  window: the shot, or the swing). `n` runs 0..7, contiguous from 0. `<id>` is
+  the weapon id in `src/game/data/items.ts`.
+- **Views** are where the weapon POINTS on screen: `e` profile, `se` 3/4
+  down-forward, `s` at the camera (foreshortened), `ne` 3/4 up-away, `n` away
+  from the camera. The west half is these mirrored, so never draw `w/sw/nw`.
+  A missing view borrows `se→e`, `s→se→e`, `ne→e`, `n→ne→e`; a view needs its
+  idle loop to count.
+- **Grid.** Frames are drawn on the pack's character pixel grid (`artScale`:
+  96 px bodies → a forearm is ~12 px, a fist ~7x8) and are blitted UNSCALED
+  with nearest filtering. Any canvas size; transparent background.
+- **Grip and muzzle.** Per weapon and view, in that view's frame pixels
+  (origin top-left), in the manifest's top-level `weapons` section:
+
+  ```json
+  "weapons": { "pistol": { "e": { "grip": [3, 6], "muzzle": [14, 2] } } }
+  ```
+
+  `grip` is the pixel that sits under the wielder's fist; every frame of the
+  view is registered to it. `muzzle` (the head, for melee) is where a mod glow
+  centres; it defaults to the grip.
+- **What the engine does.** The body's 8-way facing picks the view: aiming
+  (an engaged NPC, an attack in the last 1.5 s, a strafing player) points the
+  weapon along the facing, level at the fist; otherwise it is at low-ready,
+  one 45° sector toward the ground (profile → `se`; facing the camera →
+  mirrored `se`, across the body). Facing `ne`/`n` it draws behind the body.
+  The grip pixel lands on the fist the current body frame draws (measured per
+  frame in `src/render/handAnchors.ts` by `scripts/assets/hand_anchors.py`),
+  and the body's own fist is redrawn over the grip unless the weapon points at
+  the camera. A melee weapon with no `attack` frames chops by stepping through
+  the views (overhead, over, strike, follow-through).
 
 ## Fallback semantics (exact)
 

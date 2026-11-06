@@ -16,13 +16,18 @@
 // The brawl, siege and hive scenes were added the same way, from 8ecfd465's
 // renderer over this branch's sim; 828dffad's renderer gives the same digests.
 //
-// Aiming (feat/aim-anims-1106) moves exactly one thing in a pack without aim
-// frames: on a tick the body aims, the held weapon rises from the hip to the
-// raised hold (weaponPose.raisedPose). So the digest records only WHETHER a
-// weapon is held on those ticks, not where; aimAnims.views.test.ts asserts the
-// raised hold itself. Every digest, the aim scene's included, was regenerated
-// from the actions renderer (origin/ship/actions-1106 at 55d400a3) over this
-// branch's src/game and this test kit, and must not move.
+// Aiming (feat/aim-anims-1106) moved one thing in a pack without aim frames:
+// where the held weapon sat on an aiming tick. So the digest records only
+// WHETHER a weapon is held on those ticks, not where. Every digest, the aim
+// scene's included, was regenerated from the actions renderer
+// (origin/ship/actions-1106 at 55d400a3) over this branch's src/game and this
+// test kit.
+//
+// Held weapons (fix/weapon-sprites-v2-1106) are pack art only, and this fake
+// pack carries none, so no frame here holds a weapon. ship/integrate-1106
+// regenerated the digests for that and nothing else: with the weapon field
+// blanked, the old (aim) and new (weapon v2) renderers give identical digests
+// in every window. The draw test passes fakeWeapons() so the stow is measured.
 
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -35,6 +40,7 @@ import {
   aimScene,
   brawlScene,
   fakeArt,
+  fakeWeapons,
   hiveScene,
   shown,
   siegeScene,
@@ -44,9 +50,13 @@ import {
   type Scene,
 } from './animTestkit'
 
-const trace = (scene: Scene, extra: readonly ('draw' | 'fidget')[]): Record<number, Frame[]> => {
+const trace = (
+  scene: Scene,
+  extra: readonly ('draw' | 'fidget')[],
+  weapons?: ReturnType<typeof fakeWeapons>,
+): Record<number, Frame[]> => {
   const clips = Object.fromEntries(extra.map((s) => [s, 8]))
-  return traceWith(scene, fakeArt({ drowner: clips, gloamhound: clips }))
+  return traceWith(scene, fakeArt({ drowner: clips, gloamhound: clips }, {}, weapons))
 }
 
 /** The draw scene of actionAnims.test.ts, rendered every tick. */
@@ -80,7 +90,7 @@ describe('draw at the entity layer', () => {
   it('the drowner shows draw.0 .. draw.7 at tpf 2 from the engage tick, with its held weapon hidden', () => {
     const scene = drawScene()
     const d = scene.focus[0]
-    const frames = trace(scene, ['draw'])[d.id]
+    const frames = trace(scene, ['draw'], fakeWeapons())[d.id]
     const at = frames.findIndex((f) => shown(f).startsWith('draw.'))
     expect(at).toBeGreaterThan(0)
     const clip = frames.slice(at, at + 16)

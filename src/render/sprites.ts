@@ -2,7 +2,7 @@ import { Container, Sprite, type Texture } from 'pixi.js'
 import type { Entity, Fx } from '../game/entity'
 import { ROLL_TICKS } from '../game/systems/roll'
 import { SIM_DT } from '../game/types'
-import { burnPulse, charFootPx, cycleFrame, depthKey, entityMoving, facingDir } from './anim'
+import { burnPulse, charFootPx, cycleFrame, depthKey, entityMoving, facingDir, type Dir } from './anim'
 import {
   animFrame,
   effectiveClips,
@@ -27,13 +27,51 @@ import {
   type ArtRegistry,
   type CharSet,
   type DirPose,
+  type FistBox,
+  type HeldWeaponArt,
+  type HeldWeaponView,
 } from './art'
-import { DIR_FALLBACK, type Dir5 } from './theme'
+import { DIR_FALLBACK, WEAPON_VIEW_FALLBACK, type Dir5, type WeaponView } from './theme'
 import { weaponStack } from '../game/systems/inventory'
-import { CANVAS_REACH, hasHeldWeapon, heldScale, isMeleeWeapon, weaponShape, WEAPON_ANCHOR } from './weaponArt'
-import { raisedPose, recoilKick, weaponPose } from './weaponPose'
-import { isAiming } from '../game/aiming'
+import { hasHeldWeapon, isMeleeWeapon } from './weaponArt'
+import { HAND_RIG, heldPose, isAiming, recoilKick } from './weaponPose'
 import { composeWeaponSkin } from './weaponSkin'
+
+/** Held-weapon idle loop cadence (sim ticks per frame). */
+export const WEAPON_IDLE_TPF = 6
+
+/** Z offsets around the body: the depth key is world y in TILES, so these must
+ * stay far below any gap between two bodies. */
+const Z_BEHIND = -0.001
+const Z_FRONT = 0.001
+const Z_CAP = 0.002
+
+/** The drawn view a weapon shows for a wanted view: the view itself, else the
+ * nearest one the pack draws (theme.WEAPON_VIEW_FALLBACK). */
+export const resolveWeaponView = (art: HeldWeaponArt, view: WeaponView): HeldWeaponView | undefined => {
+  for (const v of WEAPON_VIEW_FALLBACK[view]) {
+    const got = art[v]
+    if (got) return got
+  }
+  return undefined
+}
+
+/** Where the weapon hand is in a body frame, in logical units from the feet
+ * anchor (the top-left corner of the grip pixel), plus the frame's pixel size.
+ * A measured fist when the frame has one, else the per-facing rig. */
+export const handInFrame = (
+  fist: FistBox | undefined,
+  dir: Dir,
+  frame: { width: number; height: number; resolution: number },
+): { hx: number; hy: number; unit: number } => {
+  const unit = 1 / (frame.resolution || 1)
+  if (fist) return { hx: fist.gx - frame.width / 2, hy: fist.gy - frame.height, unit }
+  const rig = HAND_RIG[dir]
+  const hs = CHAR_PX / 48
+  // Snap the rig onto the frame's pixel grid.
+  const snap = (v: number): number => Math.round(v / unit) * unit
+  return { hx: snap(rig.hx * hs), hy: snap(rig.hy * hs), unit }
+}
 
 const elementTint = (fx: Fx | undefined): number => {
   if (!fx) return 0xffffff
@@ -64,8 +102,11 @@ interface View {
   weapon?: Sprite
   /** Additive glow halo behind a MOD-lit weapon (absent when unmodded). */
   weaponGlow?: Sprite
-  /** Shape key of the weapon texture currently shown (skip redundant swaps). */
-  weaponShapeKey?: string
+  /** The wielder's own fist redrawn over the weapon's grip (art.fistCap). */
+  weaponCap?: Sprite
+  /** Last measured fist per drawn facing, held through a hit-flash frame (whose
+   * white silhouette carries no measurement). */
+  lastFist?: { dir: Dir; fist: FistBox }
 }
 
 /** A character that just died: the entity is swept from the snapshot the same
@@ -438,8 +479,7 @@ export class EntityViews {
       // attack (melee) or recoils (ranged) and re-tints from its mods. Rolling
       // is a whole-body tumble, so the weapon is stowed for its duration, and
       // a state whose clip draws the weapon (draw, aim, aimwalk) stows it too.
-      // A body that aims without such frames holds it raised (weaponPose.raisedPose).
-      if (character && !rolling && !stowsWeapon(anim.state)) this.updateWeapon(view, e, anim, t, isAiming(e, tick))
+      if (character && !rolling && !stowsWeapon(anim.state)) this.updateWeapon(view, e, anim, t, tick)
       else this.hideWeapon(view)
     }
 
@@ -467,70 +507,110 @@ export class EntityViews {
     this.updateGhosts(tick, t)
   }
 
-  /** Attach/update the wielder's held-weapon sprite. Position, rotation, tint
-   * and glow are all pure functions of sim-derived signals (facing, the attack
-   * window, the equipped weapon's mods), so the swing is deterministic and
-   * replay-stable — the renderer only draws what the sim already implies. */
-  private updateWeapon(view: View, e: Entity, anim: ResolvedAnim, t: number, aiming: boolean): void {
+  /** Attach/update the wielder's held weapon: pack art only, one drawing per
+   * view (weaponPose picks it from the facing, the aim state and the attack
+   * window), blitted UNSCALED with its grip pixel on the fist the body frame
+   * draws, and the body's own fist redrawn over the grip. Every input is a
+   * sim-derived signal, so the frame is deterministic and replay-stable. */
+  private updateWeapon(view: View, e: Entity, anim: ResolvedAnim, t: number, tick: number): void {
     const weaponId = e.combat?.weapon
-    if (weaponId === undefined || !hasHeldWeapon(weaponId)) {
+    const art = weaponId !== undefined && hasHeldWeapon(weaponId) ? this.art.heldWeapon(weaponId) : undefined
+    if (weaponId === undefined || !art) {
       this.hideWeapon(view)
       return
     }
+    const { dir, flip } = facingDir(e.facing)
+    const ranged = !isMeleeWeapon(weaponId)
+    const p = anim.state === 'attack' ? (t - anim.start) / STATE_TICKS.attack : undefined
+    const attacking = p !== undefined && p >= 0 && p < 1
+    const stepX = e.pos.x - e.prevPos.x
+    const stepY = e.pos.y - e.prevPos.y
+    const moving = Math.hypot(stepX, stepY) > 1e-4
+    const aiming = isAiming({
+      engaged: e.ai?.mode === 'aggro',
+      ticksSinceAttack: view.anim.attackStart === undefined ? undefined : tick - view.anim.attackStart,
+      // Twin-stick: walking one way while facing another (> 60° apart).
+      strafing: e.playerCtl !== undefined && moving && Math.cos(Math.atan2(stepY, stepX) - e.facing) < 0.5,
+    })
+    // A melee weapon whose pack draws the swing plays it in place; without
+    // drawn swing frames it steps through the per-sector drawings instead.
+    const rest = heldPose({ dir, flip, ranged, aiming })
+    const drawnSwing = (resolveWeaponView(art, rest.view)?.attack.length ?? 0) > 0
+    const pose = !ranged && attacking && !drawnSwing ? heldPose({ dir, flip, ranged, aiming, progress: p }) : rest
+    const clip = resolveWeaponView(art, pose.view)
+    if (!clip) {
+      this.hideWeapon(view)
+      return
+    }
+    const frame =
+      attacking && clip.attack.length > 0
+        ? clip.attack[Math.min(clip.attack.length - 1, Math.floor(p * clip.attack.length))]
+        : clip.idle[cycleFrame(tick, clip.idle.length, WEAPON_IDLE_TPF)]
 
     if (!view.weapon) {
-      const spr = new Sprite(this.art.weaponTexture(weaponId))
-      spr.anchor.set(WEAPON_ANCHOR.x, WEAPON_ANCHOR.y)
-      this.root.addChild(spr)
-      view.weapon = spr
-      view.weaponShapeKey = undefined
+      view.weapon = new Sprite(frame)
+      this.root.addChild(view.weapon)
     }
     const weapon = view.weapon
-    const shapeKey = weaponShape(weaponId)
-    if (view.weaponShapeKey !== shapeKey) {
-      weapon.texture = this.art.weaponTexture(weaponId)
-      view.weaponShapeKey = shapeKey
-    }
+    weapon.texture = frame
+    const res = frame.source.resolution || 1
+    weapon.anchor.set(clip.grip[0] / frame.source.pixelWidth, clip.grip[1] / frame.source.pixelHeight)
 
-    // Mods → skin (tint keyed off the pickup palette; NPCs carry no inventory so
-    // `weaponStack` is undefined → the untinted base look).
+    // The fist: measured on this body frame, else the last one measured for this
+    // facing (a hit-flash frame), else the per-facing rig.
+    const body = view.sprite
+    let fist = this.art.fistOf(body.texture)
+    if (fist) view.lastFist = { dir, fist }
+    else if (view.lastFist?.dir === dir && body.texture !== undefined) fist = view.lastFist.fist
+    const hand = handInFrame(fist, dir, {
+      width: body.texture.orig.width,
+      height: body.texture.orig.height,
+      resolution: body.texture.source.resolution,
+    })
+    // The grip pixel's corner, in the body's local (unmirrored) frame: the body
+    // mirror moves the hand pixel to [-hx-unit, -hx); a mirrored weapon's grip
+    // pixel spans [P-unit, P), so its anchor sits one pixel to the right.
+    const unit = hand.unit
+    const lx = (flip ? -hand.hx - unit : hand.hx) + (pose.mirror ? unit : 0)
+    const ly = hand.hy
+    // Recoil: a whole-pixel punch back along the facing.
+    const kick = ranged ? recoilKick(p) : 0
+    const snap = (v: number): number => Math.round(v / unit) * unit
+    const kx = snap(Math.cos(e.facing) * kick * (CHAR_PX / 48))
+    const ky = snap(Math.sin(e.facing) * kick * (CHAR_PX / 48))
+    // Follow the body's own transform (lean, squash) but keep the weapon on the
+    // body's pixel grid: the offset from the feet is snapped to whole pixels.
+    const sx = Math.abs(body.scale.x)
+    const sy = body.scale.y
+    const c = Math.cos(body.rotation)
+    const s = Math.sin(body.rotation)
+    const ox = snap(c * sx * lx - s * sy * ly) + kx
+    const oy = snap(s * sx * lx + c * sy * ly) + ky
+    weapon.position.set(body.position.x + ox, body.position.y + oy)
+    weapon.rotation = 0
+    weapon.scale.set(pose.mirror ? -1 : 1, 1)
     const skin = composeWeaponSkin(weaponStack(e)?.mods)
-
-    // Pose: melee swings over the fixed attack window; ranged holds and
-    // recoils. A drawn attack clip may run longer: past STATE_TICKS.attack the
-    // progress passes 1 and the weapon is back at rest while the clip plays.
-    // Hand PLACEMENT borrows the quantized 8-way facing; the weapon's ROTATION
-    // follows the continuous aim (e.facing) — the same signal bullets fire along.
-    const { dir, flip } = facingDir(e.facing)
-    const melee = isMeleeWeapon(weaponId)
-    const progress = anim.state === 'attack' ? (t - anim.start) / STATE_TICKS.attack : undefined
-    const hip = weaponPose(e.facing, dir, melee ? progress : undefined, flip)
-    const pose = aiming ? raisedPose(hip, e.facing) : hip
-    const kick = melee ? 0 : recoilKick(progress)
-
-    // The body sprite already sits at the interpolated feet point (with its
-    // lunge/flinch motion folded in); hang the hand off that, so the weapon
-    // tracks every body offset for free.
-    // Hand-rig offsets, recoil and the weapon canvas are authored in 48px-char
-    // pixels; scale them with the actual CHAR_PX so the held weapon stays pinned
-    // and proportional if the render-layer sprite size is bumped (hi-res proto).
-    const hs = CHAR_PX / 48
-    // The weapon canvas is drawing room, not hand size: `held` shrinks it to the
-    // shape's HELD_LENGTH so a pistol reads as a pistol in a 48px fist rather
-    // than a barrel nearly as long as the body (weaponArt.HELD_LENGTH).
-    const held = heldScale(weaponId)
-    const baseX = view.sprite.position.x + Math.cos(e.facing) * kick * hs
-    const baseY = view.sprite.position.y + Math.sin(e.facing) * kick * hs
-    weapon.position.set(baseX + pose.hx * hs, baseY + pose.hy * hs)
-    weapon.rotation = pose.angle
-    // Mirror vertically for the west-half aim so the grip hangs down (never
-    // upside-down); the barrel still points along `angle` (y-flip keeps local +x).
-    const size = skin.scale * held * hs
-    weapon.scale.set(size, pose.flipY ? -size : size)
     weapon.tint = skin.tint
-    weapon.alpha = view.sprite.alpha
-    // In front of the body normally; tucked behind for away-facing poses.
-    weapon.zIndex = view.sprite.zIndex + (pose.behind ? -0.5 : 0.5)
+    weapon.alpha = body.alpha
+    weapon.zIndex = body.zIndex + (pose.behind ? Z_BEHIND : Z_FRONT)
+
+    // The hand closes over the grip: the body's own fist pixels, drawn again
+    // above the weapon with the body's exact transform.
+    if (pose.cap && fist) {
+      if (!view.weaponCap) {
+        view.weaponCap = new Sprite()
+        this.root.addChild(view.weaponCap)
+      }
+      const cap = view.weaponCap
+      cap.texture = this.art.fistCap(body.texture, fist)
+      cap.anchor.copyFrom(body.anchor)
+      cap.position.copyFrom(body.position)
+      cap.scale.copyFrom(body.scale)
+      cap.rotation = body.rotation
+      cap.tint = body.tint
+      cap.alpha = body.alpha
+      cap.zIndex = body.zIndex + Z_CAP
+    } else this.dropCap(view)
 
     if (skin.glow > 0) {
       if (!view.weaponGlow) {
@@ -541,13 +621,13 @@ export class EntityViews {
         view.weaponGlow = glow
       }
       const glow = view.weaponGlow
-      // Centre the halo on the weapon head, halfway out along the held length.
-      const reach = (CANVAS_REACH / 2) * size
-      glow.position.set(weapon.position.x + Math.cos(pose.angle) * reach, weapon.position.y + Math.sin(pose.angle) * reach)
+      const mx = (clip.muzzle[0] - clip.grip[0]) / res
+      const my = (clip.muzzle[1] - clip.grip[1]) / res
+      glow.position.set(weapon.position.x + (pose.mirror ? -mx : mx), weapon.position.y + my)
       glow.tint = skin.glowColor
-      glow.alpha = skin.glow * view.sprite.alpha
-      glow.scale.set(0.7 * size)
-      glow.zIndex = weapon.zIndex - 0.1
+      glow.alpha = skin.glow * body.alpha
+      glow.scale.set(0.5 * skin.scale)
+      glow.zIndex = weapon.zIndex - 0.0005
     } else if (view.weaponGlow) {
       this.root.removeChild(view.weaponGlow)
       view.weaponGlow.destroy()
@@ -555,20 +635,28 @@ export class EntityViews {
     }
   }
 
-  /** Drop a view's weapon/glow sprites (bare fists, non-characters, rolling, or
-   * on view teardown). Idempotent. */
+  private dropCap(view: View): void {
+    if (view.weaponCap) {
+      this.root.removeChild(view.weaponCap)
+      view.weaponCap.destroy()
+      view.weaponCap = undefined
+    }
+  }
+
+  /** Drop a view's weapon/cap/glow sprites (bare fists, non-characters, rolling,
+   * or on view teardown). Idempotent. */
   private hideWeapon(view: View): void {
     if (view.weapon) {
       this.root.removeChild(view.weapon)
       view.weapon.destroy()
       view.weapon = undefined
     }
+    this.dropCap(view)
     if (view.weaponGlow) {
       this.root.removeChild(view.weaponGlow)
       view.weaponGlow.destroy()
       view.weaponGlow = undefined
     }
-    view.weaponShapeKey = undefined
   }
 
   /** Advance death ghosts: play the death clip (theme frames or the held last

@@ -1,8 +1,8 @@
-// Aiming with no aim frames shipped yet: the held gun rises from the hip to the
-// raised hold (src/render/weaponPose.ts raisedPose). A pistol player stands at
+// Aiming with no aim frames shipped yet: the held gun (pack art, when a pack
+// draws it) stays in the fist (weaponPose.heldPose). A pistol player stands at
 // the centre of a ring of eight drowners; each engages, winds up (16 ticks),
-// raises its harpoon gun at the player and fires, strafing round the ring, so
-// all eight facings of the raised hold are on screen at once. The player cannot
+// aims at the player and fires, strafing round the ring, so all eight aiming
+// facings are on screen at once. The player cannot
 // die and holds a pistol, so it aims too (always, for a player with a gun).
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'

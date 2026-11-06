@@ -5,7 +5,7 @@
 //
 // Test-only: nothing in the game imports this file.
 
-import { Texture, type Renderer, type Sprite } from 'pixi.js'
+import { Texture, TextureSource, type Renderer, type Sprite } from 'pixi.js'
 import { createEventLog } from '../app/eventLog'
 import { isAiming } from '../game/aiming'
 import type { Entity } from '../game/entity'
@@ -16,7 +16,8 @@ import { arm, runTicks, walledRoom, worldFromRows } from '../game/testkit'
 import type { InputCmd } from '../game/types'
 import type { World } from '../game/world'
 import type { AnimStateName } from './animState'
-import { createArt, type ArtRegistry, type CharSet, type DirPose } from './art'
+import { WEAPONS } from '../game/data/items'
+import { createArt, type ArtRegistry, type CharSet, type DirPose, type HeldWeaponArt } from './art'
 import { EntityViews } from './sprites'
 
 const DIRS = ['s', 'se', 'e', 'ne', 'n'] as const
@@ -48,10 +49,28 @@ export const KINDS = ['player', 'mutant', 'drowner', 'gloamhound', 'lobber', 'hi
 export const fakeArt = (
   clips: Partial<Record<(typeof KINDS)[number], FakeClips>> = {},
   tpf: Partial<Record<AnimStateName, number>> = {},
+  weapons?: Record<string, HeldWeaponArt>,
 ): ArtRegistry => {
   const chars: Record<string, CharSet> = {}
   for (const k of KINDS) chars[k] = fakeSet(k, clips[k])
-  return createArt(fakeRenderer, { chars }, {}, tpf, true)
+  return createArt(fakeRenderer, { chars, weapons }, {}, tpf, true)
+}
+
+/** Placeholder held-weapon art for every weapon in the game: each view one
+ * 17x11 idle frame, grip (3,6). A pack without weapon art draws no held weapon
+ * (sprites.ts updateWeapon), so a test that checks where the held sprite shows
+ * or hides passes this as fakeArt's `weapons`. */
+export const fakeWeapons = (): Record<string, HeldWeaponArt> => {
+  const out: Record<string, HeldWeaponArt> = {}
+  for (const id of Object.keys(WEAPONS)) {
+    const art: HeldWeaponArt = {}
+    for (const v of ['e', 'se', 's', 'ne', 'n'] as const) {
+      const t = new Texture({ source: new TextureSource({ width: 17, height: 11 }), label: `weapon.${id}.${v}` })
+      art[v] = { idle: [t], attack: [], grip: [3, 6], muzzle: [14, 2] }
+    }
+    out[id] = art
+  }
+  return out
 }
 
 interface ViewInternals {
@@ -135,7 +154,9 @@ export const trace = (scene: Scene, art: ArtRegistry, opts: TraceOpts = {}): Rec
         sx: s.scale.x,
         sy: s.scale.y,
         alpha: s.alpha,
-        weapon: v?.weapon ? `${v.weapon.rotation.toFixed(6)}@${v.weapon.position.x.toFixed(3)},${v.weapon.position.y.toFixed(3)}` : null,
+        weapon: v?.weapon
+          ? `${v.weapon.texture.label ?? '?'}:${v.weapon.rotation.toFixed(6)}@${v.weapon.position.x.toFixed(3)},${v.weapon.position.y.toFixed(3)}`
+          : null,
         ...(g ? { ghost: true as const } : {}),
         ...(v && isAiming(e, scene.w.tick) ? { aiming: true as const } : {}),
       })

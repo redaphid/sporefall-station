@@ -1,27 +1,23 @@
 // Aiming at the entity layer the game draws with: EntityViews over a real
 // createArt registry fed a fake pack whose every frame is its own labelled
 // texture, the real sim underneath (animTestkit.aimScene). Reads back which
-// frame each sprite shows and where the held weapon sits, tick by tick.
+// frame each sprite shows and whether the held weapon shows, tick by tick.
+// Where a held weapon sits is weapon v2's (heldWeapon.views.test.ts).
 
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_TPF } from './animState'
-import { aimScene, fakeArt, shown, trace, type Frame } from './animTestkit'
-import { AIM_RAISE, HAND_RIG } from './weaponPose'
+import { aimScene, fakeArt, fakeWeapons, shown, trace, type Frame } from './animTestkit'
 
 const AIM = { aim: 2, aimwalk: 8 }
-const run = (clips: Record<string, number>): { player: Frame[]; drowner: Frame[] } => {
+const run = (clips: Record<string, number>, weapons = true): { player: Frame[]; drowner: Frame[] } => {
   const scene = aimScene()
   const [p, d] = scene.focus
-  const t = trace(scene, fakeArt({ player: clips, drowner: clips }))
+  const t = trace(scene, fakeArt({ player: clips, drowner: clips }, {}, weapons ? fakeWeapons() : undefined))
   return { player: t[p.id], drowner: t[d.id] }
 }
 /** Index into a trace by the scene's 0-based input tick. */
 const at = (frames: Frame[], i: number): Frame => frames[i]
 const dirOf = (f: Frame): string => f.tex.split('.')[1]
-const weaponXY = (f: Frame): { x: number; y: number } => {
-  const [x, y] = f.weapon!.split('@')[1].split(',').map(Number)
-  return { x, y }
-}
 
 describe('aim frames at the entity layer', () => {
   const { player, drowner } = run(AIM)
@@ -72,32 +68,28 @@ describe('aim frames at the entity layer', () => {
   })
 })
 
-describe('without aim frames the held weapon rises from the hip to the raised hold', () => {
+describe('without aim frames the body walks and idles and keeps the held weapon in hand', () => {
   const { player, drowner } = run({})
 
-  it('aiming east: the grip sits at chest height, an arm out along the aim, on every aiming tick', () => {
-    const rows = player.slice(0, 200).filter((f) => f.aiming && f.weapon !== null)
-    expect(rows.length).toBeGreaterThan(150)
-    for (const f of rows) {
-      const w = weaponXY(f)
-      expect(w.y - f.y, `tick ${f.tick}`).toBeCloseTo(AIM_RAISE.chest, 3)
-      // Ranged recoil (≤ 3px back along the aim) is the only other x term.
-      const dx = w.x - f.x - (HAND_RIG.e.hx * AIM_RAISE.side + AIM_RAISE.reach)
-      expect(dx, `tick ${f.tick}`).toBeLessThanOrEqual(0.001)
-      expect(dx, `tick ${f.tick}`).toBeGreaterThanOrEqual(-3.001)
-    }
-  })
-
-  it('not aiming (wrench): the grip hangs at the hip rig as before', () => {
-    const rows = player.slice(205).filter((f) => !f.aiming && f.weapon !== null)
-    expect(rows.length).toBeGreaterThan(40)
-    for (const f of rows) expect(weaponXY(f).y - f.y).toBeCloseTo(HAND_RIG.s.hy, 3)
-  })
-
-  it('the body never shows an aim frame and the drowner keeps its weapon in hand while aiming', () => {
+  it('the body never shows an aim frame, and on every aiming tick the held sprite shows', () => {
     for (const f of [...player, ...drowner]) expect(shown(f)).not.toMatch(/^aim/)
-    const aimed = drowner.filter((f) => f.aiming)
-    expect(aimed.length).toBeGreaterThan(20)
-    for (const f of aimed) expect(f.weapon).not.toBeNull()
+    const aimed = [...player, ...drowner].filter((f) => f.aiming && !f.ghost)
+    expect(aimed.length).toBeGreaterThan(150)
+    for (const f of aimed) expect(f.weapon, `tick ${f.tick}`).not.toBeNull()
+  })
+
+  it('not aiming (wrench): the held sprite shows too', () => {
+    const rows = player.slice(205).filter((f) => !f.aiming)
+    expect(rows.length).toBeGreaterThan(40)
+    for (const f of rows) expect(f.weapon).not.toBeNull()
+  })
+})
+
+describe('a pack with no weapon art draws no held weapon, aiming or not', () => {
+  const { player, drowner } = run({}, false)
+
+  it('no frame of either body carries a held sprite', () => {
+    expect(player.some((f) => f.aiming)).toBe(true)
+    for (const f of [...player, ...drowner]) expect(f.weapon).toBeNull()
   })
 })

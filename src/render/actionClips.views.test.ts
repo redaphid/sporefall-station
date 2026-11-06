@@ -11,7 +11,7 @@
 import { describe, expect, it } from 'vitest'
 import { runTicks } from '../game/testkit'
 import { HURT_FLASH_TICKS, hurtStart, STATE_TICKS } from './animState'
-import { brawlScene, fakeArt, shown, trace, type Frame, type Scene } from './animTestkit'
+import { brawlScene, fakeArt, fakeWeapons, shown, trace, type Frame, type Scene } from './animTestkit'
 
 /** The brawl with the player holding fire: the mutant swings at a player it
  * never quite reaches, and nobody is hurt. */
@@ -32,8 +32,8 @@ const SWING_EVERY = 15
 describe('a drawn attack plays its whole clip', () => {
   const scene = swingScene()
   const mutant = scene.focus[1]
-  const drawn = trace(scene, fakeArt({ mutant: { attack: 7 } }))[mutant.id]
-  const plain = trace(swingScene(), fakeArt())[mutant.id]
+  const drawn = trace(scene, fakeArt({ mutant: { attack: 7 } }, {}, fakeWeapons()))[mutant.id]
+  const plain = trace(swingScene(), fakeArt({}, {}, fakeWeapons()))[mutant.id]
 
   it('7 frames at tpf 2: attack.0 .. attack.6 over 14 ticks from every swing, then out of the state', () => {
     const at = onsets(drawn, 'attack')
@@ -65,7 +65,7 @@ describe('a drawn attack plays its whole clip', () => {
     expect(onsets(drawn, 'attack').map((i) => drawn[i].tick)).toEqual(rose)
   })
 
-  it('the held wrench swings on the fixed window: its angle is the same tick for tick as without the clip', () => {
+  it('the held wrench swings on the fixed window: its drawing is the same tick for tick as without the clip', () => {
     const angle = (f: Frame): string | undefined => f.weapon?.split('@')[0]
     expect(drawn.map(angle)).toEqual(plain.map(angle))
     expect(new Set(drawn.map(angle)).size).toBeGreaterThan(2) // it does swing

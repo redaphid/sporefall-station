@@ -157,6 +157,8 @@ def cmd_post(a):
     raws = {(d, p): Image.open(f"{base}/raw/{d}-{p}.png").convert("RGB")
             for d in dirs for p in poses if os.path.exists(f"{base}/raw/{d}-{p}.png")}
     pal = S.anchor_palette(meta["palette_from"])
+    for extra in a.palette_add or []:  # a held prop's own colours (the shipped weapon sprite), so it keeps them
+        pal = list(dict.fromkeys(list(map(tuple, pal)) + [tuple(c) for c in S.anchor_palette(extra, min_share=0.01)]))
     backdrop = P.corner_bg(next(iter(raws.values())))
     pockets, band = S.pocket_key(meta.get("input"), backdrop)
     ghost = S.ghost_pal(meta.get("input"), backdrop, pal)
@@ -306,6 +308,8 @@ def main():
     p.add_argument("--props", action="append", help="dir=CTL: paint the rig's held props (joints-NN.json `props`)")
     p.add_argument("--no-paint", action="store_true", help="keep the rig's props out of the frame: the model drew "
                    "the weapon (docs/art-direction.md: no hand-drawn guns in shipped frames)")
+    p.add_argument("--palette-add", action="append", help="add a sprite's colours to the s-idle palette (the held "
+                   "weapon's shipped sprite), so the weapon the model drew keeps its own greys")
     p.add_argument("--breathe", action="store_true", help="odd frames raise the upper body 1 px above the belt (a held pose's breath)")
     p.add_argument("--out", required=True)
     p = sub.add_parser("export")

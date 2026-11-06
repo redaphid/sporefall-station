@@ -11,9 +11,10 @@
  * One table, ANIM_STATE_DEFS, says everything the engine knows about a state:
  * whether it loops, its cadence, how long a one-shot stays up, what it borrows
  * when a pack draws no frames for it, and whether it hides the held weapon. A
- * new action is a row here, a start source in animTracker.ts, and a slot in
- * ANIM_PRIORITY; the theme loader, manifest validation and key grammar all
- * iterate ANIM_STATES, so the frames load with no further change.
+ * new action is a row here, a start source in animTracker.ts (a field it
+ * observes on the entity, or a row in EVENT_STARTS for a sim event), and a
+ * slot in ANIM_PRIORITY; the theme loader, manifest validation and key grammar
+ * all iterate ANIM_STATES, so the frames load with no further change.
  */
 
 // ---------------------------------------------------------------------------

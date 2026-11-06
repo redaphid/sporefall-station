@@ -195,7 +195,7 @@ render-side start signals live in `src/render/animTracker.ts`.
 |---|---|---|---|
 | `idle` | loop | nothing else active | — |
 | `walk` | loop | entity is moving | while moving |
-| `attack` | one-shot | an attack/throw fired (weapon cooldown observed starting) | its drawn clip, at least 6 ticks |
+| `attack` | one-shot | an attack/throw fired (weapon cooldown observed starting); a `lobber` firing a shell, a `hivespire` budding or spreading (sim events, drawn frames only) | its drawn clip, at least 6 ticks |
 | `hurt` | one-shot | took a hit (`status.hitFlashUntil`) | its drawn clip, at least 8 ticks |
 | `roll` | one-shot | dodge-roll active | the sim's roll window (12 ticks) |
 | `death` | one-shot | entity died (render-side ghost; corpses leave the snapshot the same tick) | its drawn clip, at least 18 ticks |
@@ -249,6 +249,16 @@ window keep it whatever the art:
   the impact on frame 1.
 - `death`: a drawn death gets no topple. The body stays opaque, fades out over
   the clip's last 18 ticks, and is gone when the clip ends.
+
+**Attacks that start from a sim event.** The lobber's shell and a hive spire's
+budding or spreading raise no weapon cooldown, so the renderer starts their
+`attack` from the sim event (`lob`; `hiveSpawn` and `hiveSpread`, on the spire
+that buds, not the bud). The table of such events is `EVENT_STARTS` in
+`src/render/animTracker.ts`. The clip starts on the event's own tick even when
+the frame that first sees it runs later (a slow frame, a hitstop). An
+event-started attack plays only drawn frames: without `char.lobber.*-attack-*`
+art the lobber looks exactly as it did before, with no borrowed pose and no
+lunge.
 
 A new trigger restarts the clip from frame 0. Keep an attack clip no longer
 than the kind's attack interval, or its tail is never seen: a wrench swings

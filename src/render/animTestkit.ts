@@ -6,6 +6,7 @@
 // Test-only: nothing in the game imports this file.
 
 import { Texture, type Renderer, type Sprite } from 'pixi.js'
+import { createEventLog } from '../app/eventLog'
 import type { Entity } from '../game/entity'
 import { spawnNpc } from '../game/populate'
 import { spawnPlayer } from '../game/player'
@@ -93,19 +94,28 @@ export interface TraceOpts {
   stride?: number
   /** Ticks on which the entity layer is frozen (hitstop): no update runs. */
   frozen?: (tick: number) => boolean
+  /** What the views are handed as the event log: the log main.ts keeps
+   * (default), only the rendered tick's own events (`view.events` on a host),
+   * or none at all. */
+  events?: 'log' | 'lastTick' | 'none'
 }
 
-/** Run the scene and record each focus entity's sprite on every rendered tick. */
+/** Run the scene and record each focus entity's sprite on every rendered tick.
+ * The event log is fed after every tick, the way main.ts feeds it. */
 export const trace = (scene: Scene, art: ArtRegistry, opts: TraceOpts = {}): Record<number, Frame[]> => {
   const views = new EntityViews(art)
+  const log = createEventLog()
   const stride = opts.stride ?? 1
   const out: Record<number, Frame[]> = {}
   for (const e of scene.focus) out[e.id] = []
   for (let i = 0; i < scene.n; i++) {
     scene.before(i)
     runTicks(scene.w, scene.inputs ?? new Map(), 1)
+    log.afterTick(scene.w.tick, scene.w.events)
     if ((i + 1) % stride !== 0 || opts.frozen?.(scene.w.tick)) continue
-    views.update(scene.w.entities, 0.5, scene.w.tick, scene.w.floor)
+    const events =
+      opts.events === 'none' ? [] : opts.events === 'lastTick' ? [{ tick: scene.w.tick, events: scene.w.events }] : log.entries
+    views.update(scene.w.entities, 0.5, scene.w.tick, scene.w.floor, events)
     for (const e of scene.focus) {
       const v = internals(views).views.get(e.id)
       const g = v ? undefined : internals(views).ghosts.find((x) => x.id === e.id)

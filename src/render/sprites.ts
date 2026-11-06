@@ -15,7 +15,8 @@ import {
   type AnimStateName,
   type ResolvedAnim,
 } from './animState'
-import { trackAnim, type AnimMemory } from './animTracker'
+import { eventStarts, trackAnim, type AnimMemory } from './animTracker'
+import type { TickEvents } from '../app/eventLog'
 import { composeMotion, IDENTITY_POSE, locomotionFor, type MotionPose } from './motion'
 import {
   ARCHETYPE_SCALE,
@@ -261,9 +262,16 @@ export class EntityViews {
   private prevTick = -1
   private prevFloor = -1
 
-  update(entities: readonly Entity[], alpha: number, tick: number, floor = 0): void {
+  /** `eventLog` is the RenderView's (app/eventLog.ts): the events of every
+   * tick since the last update start one-shots (animTracker.EVENT_STARTS),
+   * however many ticks this frame ran or a hitstop skipped. */
+  update(entities: readonly Entity[], alpha: number, tick: number, floor = 0, eventLog: readonly TickEvents[] = []): void {
     for (const view of this.views.values()) view.seen = false
     const t = tick + alpha // continuous view-time for smooth procedural juice
+    // Ticks not yet read: everything since the last update on this floor; on
+    // the first update, a floor change or a rewind, this tick's alone.
+    const since = this.prevFloor === floor && this.prevTick >= 0 && tick >= this.prevTick ? this.prevTick : tick - 1
+    const fromEvents = eventStarts(eventLog, since, tick)
 
     for (const e of entities) {
       if (e.dead) continue
@@ -316,7 +324,7 @@ export class EntityViews {
       // Death never appears here — corpses are swept the same tick and
       // continue as ghosts (toGhost).
       const anim: ResolvedAnim = character
-        ? trackAnim(view.anim, e, tick, clipTicksFor(this.art, charSet, facing))
+        ? trackAnim(view.anim, e, tick, clipTicksFor(this.art, charSet, facing), fromEvents.get(e.id))
         : { state: moving ? 'walk' : 'idle', start: 0 }
 
       const flashing = e.status !== undefined && e.status.hitFlashUntil > tick

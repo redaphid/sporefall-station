@@ -59,12 +59,12 @@
  "derelict-bot": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 44,
-   "width": 38,
-   "head_h": 36,
-   "mass": 782,
-   "cx": 0.05,
-   "foot_y": 45
+   "height": 45,
+   "width": 20,
+   "head_h": 17,
+   "mass": 453,
+   "cx": -0.46,
+   "foot_y": 46
   },
   "tol": {
    "height": 2,

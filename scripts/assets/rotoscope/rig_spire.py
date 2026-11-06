@@ -41,8 +41,9 @@ SHADOW = (20, 26, 22)
 # every neighbouring pair differs (no held frame); the cap lifts a frame behind the squash, as overlapping action
 IDLE = {"drop": [0, 1, 2, 3, 3, 2, 1, 1], "lift": [0, 0, 1, 1, 2, 2, 1, 0], "bud": [6, 7, 8, 9, 9, 8, 7, 6]}
 # attack: bud_dy is how far the bud has fallen; burst draws a splat at the roots in place of the bud
-ATTACK = {"drop": [0, 2, 3, 1, 0, 1, 1, 0], "lift": [0, 2, 3, 3, 2, 1, 0, 0], "bud": [6, 9, 11, 10, 0, 0, 0, 6],
-          "bud_dy": [0, 0, 1, 14, 0, 0, 0, 0], "burst": [0, 0, 0, 0, 1, 2, 0, 0]}
+# attack (2 ticks a frame): squash and open, the bud at its biggest, it falls, bursts at the roots, settles to idle 0
+ATTACK = {"drop": [0, 3, 3, 1, 0, 1, 1, 0], "lift": [0, 2, 3, 3, 2, 1, 0, 0], "bud": [6, 9, 11, 10, 0, 0, 4, 6],
+          "bud_dy": [0, 0, 0, 26, 0, 0, 0, 0], "burst": [0, 0, 0, 0, 1, 2, 0, 0]}
 
 
 def nn_rows(layer, h):
@@ -114,15 +115,15 @@ def disc(dst, cx, cy, d, fill, shade, rim, front_mask=None):
 
 
 def splat(dst, cx, cy, size):
-    """The burst bud at the roots: a low glow ring that spreads (size 1) and fades to moss (size 2)."""
-    w = 4 + 3 * size
-    for x in range(int(cx - w), int(cx + w) + 1):
-        for y in (cy - 1, cy):
-            dx = abs(x + 0.5 - cx) / w
-            if dx > 1 or (y == cy - 1 and dx > 0.6):
-                continue
-            c = (GLOW if dx < 0.5 else GLOW_HOT) if size == 1 else SPLAT
-            dst[int(y), x] = (*c, 255)
+    """The bud bursting at the roots: a glow puff (size 1), then a moss stain spreading with a fading core (size 2)."""
+    rows = {1: [(5, 2, GLOW), (4, 2, GLOW_HOT), (2, 0, GLOW)], 2: [(8, 3, SPLAT), (6, 1, SPLAT), (0, 0, SPLAT)]}[size]
+    for k, (w, core, c) in enumerate(rows):
+        y = int(cy) - k
+        for x in range(int(cx - w), int(cx + w) + 1):
+            dx = abs(x + 0.5 - cx)
+            if dx <= w + 0.5:
+                col = c if dx > core + 0.5 else (GLOW if size == 2 else GLOW_HOT if k == 1 else c)
+                dst[y, x] = (*col, 255)
 
 
 def frame(src, az, drop, lift, bud, bud_dy=0, burst=0):
@@ -156,8 +157,8 @@ def frame(src, az, drop, lift, bud, bud_dy=0, burst=0):
                 out[y, x] = (*c, 255)
     if bud and not behind:
         disc(out, bx, by, bud, BUD_SKIN, BUD_SHADE, RIM_DARK)
-    if burst:
-        splat(out, bx, 84 + int(3 * depth), burst)
+    if burst and not behind:  # behind the spire the roots hide it
+        splat(out, bx, 79 + int(3 * depth), burst)
     return out
 
 

@@ -349,6 +349,18 @@ def main():
               S.pocket_key(dark, white) == (S.POCKET_PX, 1.0))
         check("key: pocket keying in the leg band only for an anchor whose pale part is above it (a chest, a shell)",
               S.pocket_key(pale, white) == (S.POCKET_PX, S.POCKET_BAND))
+        gauge, specks = os.path.join(tmp, "gauge-anchor.png"), os.path.join(tmp, "specks-anchor.png")
+        for path, marks in ((gauge, [(40, 20, 44, 24)]), (specks, [(20 + 4 * i, 30, 20 + 4 * i, 30) for i in range(12)])):
+            ga = Image.new("RGBA", (96, 96), (0, 0, 0, 0))  # a dark box robot, its pale share under POCKET_PALE
+            dg = ImageDraw.Draw(ga)
+            dg.rectangle((10, 5, 85, 90), fill=(60, 68, 77, 255))
+            for m in marks:
+                dg.rectangle(m, fill=CHEST)
+            ga.save(path)
+        check("key: pocket keying in the leg band only for a small pale part in one piece (the derelict-bot's gauge)",
+              S.pocket_key(gauge, white) == (S.POCKET_PX, S.POCKET_BAND))
+        check("key: pocket keying everywhere for the same pale share in specks",
+              S.pocket_key(specks, white) == (S.POCKET_PX, 1.0))
         legs = os.path.join(tmp, "pale-legs-anchor.png")
         pl = wren()
         ImageDraw.Draw(pl).rectangle((380, 760, 650, 900), fill=CHEST)  # cream trousers: pale in the leg band

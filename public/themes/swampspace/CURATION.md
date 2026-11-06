@@ -505,12 +505,30 @@ quadruped route in `docs/cast-walks/PIPELINE-NONBIPED.md`.
 | backdrop | `spritesheet.py` keys the backdrop the legs enclose in the lower 40% of the silhouette, and flat backdrop anywhere (`pocket_key`, `POCKET_FLAT`); the shell's pale highlights had switched pocket keying off for this kind |
 | hind legs | after export, `/mnt/d/tmp/cast-walks/runs/carapace-brute-1105/tools/hindlegs.py` moves the hide ramp one step lighter in the rear hind-leg box below the belly of s/se/e/ne ((35,40,46) -> (22,58,62) -> (36,86,92) -> (58,122,128); outlines and claws kept): 13671 px at 96, 4137 at 48 |
 | export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys for `char.brute.*` |
+## spore-mortar (lobber), 2026-11-05: redesigned (coil-carrier), walking, se/e/ne by skeleton control
+
+The siege gun (`npcs.ts` `lobber`: sets up at range and lobs arcing spore
+shells over walls, speed 2.4) had one frame, the August hires s-idle, a
+muscled grey brute under a barrel cannon. Procedure:
+[`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md).
+
+| stage | what |
+|---|---|
+| design | Step 0 redesign from the critic's v3 pick (`assets/identity/watched/coiled-rusted-essence.png`, pedestal dropped). Lore family B (swamp fauna, no clothing): a squat crouching charcoal creature with teal essence mottling (G4) that swallows essence bubbles and coils them into the glowing orange spore shell it cradles at its belly and lobs (the single hot accent; the eyes share its hue). It holds nothing else; the renderer draws its weapon. Thinnest limb 4 px at 96 px, torso .43 of height. Design sheet: https://2cb.pw/design-sheet-fa9ba6 |
+| input | the concept redrawn by `concept_to_input.py` (Qwen-Image-Edit, seed 3 of 4), the concept's breast shading flattened at 96 px (90 px set to the torso midtone), sha256 `a7fb7741825859e7…`; old anchor archived at `/mnt/d/tmp/cast-walks/archive/spore-mortar/` |
+| keyframes | Qwen-Image-Edit-2511 + Lightning 4-step + multiple-angles LoRA, one per direction, `--motion prowl` (a crouched stride; `walk` stands a crouch up). s/se/e describe sizes the shell ("as wide as its chest"). ne/n: take1's keyframes with the buttock cleft, rump crease and near-side eye and ear slot painted to the body midtone on CPU, passed back with `--keyframe` |
+| motion | s: Wan 2.2 I2V A14B Q4_K_M hi/lo, 848x480, 81 frames at 16 fps. n: the same, from the cleaned keyframe. se, e, ne: Wan Fun-Control driven by the stick-skeleton biped rig (`scripts/assets/rotoscope/rig_biped.py`, period 24, half-stride 60, lift 22, arm swing 0 so both hands stay on the shell), moves "waddles in place ... staying crouched low" |
+| takes | s take2 (seed 11). n take3 (seed 23, cleaned keyframe; take1 .623 drew bare buttocks, take2 .736 drew a loincloth). se skel1 (seed 3; Wan take2 .438 passed the seam but its idle stood 2 px above the loop's lowest forward foot on the 48 px pack, so the rig keeps the feet on one ground line: az -45, elev 3). e skel1 (seed 3; Wan take2 .227 boiled .466). ne skel2 (seed 11, plain-head keyframe; three Wan takes failed .746 / .794 / .923, skel1 read as showing a face) |
+| loops | the shortest full stride: s period 17 (seam .401), se 24 (.286), e 24 (.199), ne 24 (.140), n 16 (.603) |
+| colour lock | `assemble` snaps every frame onto the s-idle's colours, all in the locked 34 |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys for `char.lobber.*` |
 
 Gates (`cast_walk.py gate`), 2026-11-05, gate 938319cdcc807028 (G7), all PASS (9/9):
 
 | # | gate | result |
 |---|---|---|
 | 1 | loop seam, max .5 (n 1.0) | .129 / .112 / .103 / .113 / .125 |
+| 1 | loop seam, max .5 (n 1.0) | .401 / .286 / .199 / .140 / .603 |
 | 2 | colour drift vs s-idle, max 1% | 0 in every direction |
 | 3 | silhouette spec | 0 violations |
 | 4a | VLM view of every frame, against its own s-idle and n-idle | 0 of 50 fail |
@@ -569,3 +587,13 @@ facing the viewer); the n keyframe repaint above fixed it. Nothing parked. Known
 the gauge face is keyed out as a backdrop pocket (it is under `POCKET_PALE` of the anchor), so it
 shows as a dark socket where s shows a pale dial. Frame heights: 86-92 px on the hi-res pack,
 42-46 on the 48 px pack.
+| 5 | judge identity, sharpness and coverage; boil max .3; head drift max .14 | boil .116-.156, head .023-.087 |
+| 6 | VLM style vs the frog, rendering only | 0 of 10 |
+| 6b | pixels off the locked palette, max 0 | 0.0 |
+
+The first gate run (on the export with Wan se/e and skel1 ne) failed 7/9:
+4a, every ne frame "shows a face", and 5, e boil .466. Nothing parked. The
+gait is a low crouched shuffle, not a stride: lower-third silhouette change
+over the loop is s .36, se .39, e .41, ne .61, n .28 (frog-settler s .29,
+mycologist e .39). Frame heights: 86-92 px on the hi-res pack, 43-46 on the
+48 px pack.

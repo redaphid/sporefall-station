@@ -345,10 +345,10 @@
   "ref_frame": "s-idle",
   "ref": {
    "height": 34,
-   "width": 30,
+   "width": 31,
    "head_h": 31,
-   "mass": 554,
-   "cx": -0.65,
+   "mass": 564,
+   "cx": -1.15,
    "foot_y": 46
   },
   "tol": {

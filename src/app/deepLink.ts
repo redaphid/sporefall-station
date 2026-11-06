@@ -40,6 +40,10 @@ export const readDeepLink = (params: URLSearchParams): DeepLink => ({
   seed: Number(params.get('seed')) || null,
 })
 
+/** A plain run (no scenario, state, world or script named) opens on a card pick. */
+export const opensOnDraft = (link: DeepLink): boolean =>
+  link.scenario === null && link.state === null && link.world === null && link.script === null
+
 /**
  * Does this URL name the world to play? If so it ALWAYS wins over the saved
  * run: the save is neither resumed nor written.

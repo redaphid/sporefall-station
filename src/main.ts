@@ -28,6 +28,7 @@ import { applyScenario, isKnownScenario, SCENARIO_NAMES } from './game/scenarios
 import {
   DEEP_LINK_FRESHEN_MS,
   DEEP_LINK_RELOAD_GRACE_MS,
+  opensOnDraft,
   persistsRun,
   readDeepLink,
   resumesSave,
@@ -336,6 +337,7 @@ const boot = async (): Promise<void> => {
     coop,
     uiMount,
     renderer,
+    opening: opensOnDraft(link),
   })
   if (!session) return
   // Online play gets a link chip: round trip, or a weak/reconnecting warning.
@@ -706,6 +708,8 @@ interface SessionDeps {
   coop: ReturnType<typeof createGamepadCoop>
   uiMount: HTMLElement
   renderer: GameRenderer
+  /** Open the run on a card pick (`opensOnDraft`). */
+  opening: boolean
 }
 
 /**
@@ -744,7 +748,7 @@ const watchLinkPairs = (transport: Transport): void => {
 
 const createSession = async (mode: Exclude<GameMode, 'online'>, deps: SessionDeps): Promise<Session | null> => {
   if (mode === 'solo') {
-    const session = new HostSession(deps.seed, deps.input, deps.coop, 'normal')
+    const session = new HostSession(deps.seed, deps.input, deps.coop, 'normal', deps.opening)
     deps.renderer.setLevel(session.world.level)
     return session
   }
@@ -765,7 +769,7 @@ const createSession = async (mode: Exclude<GameMode, 'online'>, deps: SessionDep
     // Bring a host session up on `transport`. Start is only offered once this
     // succeeds, so a host that is not on the air never looks like one.
     const goLive = async (transport: Transport): Promise<NetHostSession> => {
-      const session = new NetHostSession(deps.seed, deps.name, deps.input, transport, 'normal')
+      const session = new NetHostSession(deps.seed, deps.name, deps.input, transport, 'normal', undefined, undefined, deps.opening)
       try {
         await session.start()
       } catch (err) {
@@ -1408,6 +1412,7 @@ const runLoop = (
           Math.ceil((draft.until - view.tick) / SIM_RATE),
           draft.inPlay ? 'strip' : 'full',
           draftLoadout(view),
+          draft.opening,
         )
         // Twin-stick aim reticles: one per joined pad with a deflected right stick,
         // anchored to that pad's player entity. Presentation only.

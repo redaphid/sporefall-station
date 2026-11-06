@@ -257,6 +257,9 @@ export interface DraftHand {
    * fresh press, and a hand opens with every bit set, so a stick or trigger still
    * held from walking onto the exit does nothing until released. */
   held: number
+  /** The run's opening hand, dealt at the landing of floor 1 (draft.ts
+   * `dealOpeningDraft`) rather than on a floor exit. Absent on floor-exit hands. */
+  opening?: true
 }
 
 export interface Loadout {

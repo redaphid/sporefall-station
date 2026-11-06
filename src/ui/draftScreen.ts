@@ -38,6 +38,8 @@ export interface LocalDraft {
   until: number
   /** A live local player without an open hand is back in the fight and must see it. */
   inPlay: boolean
+  /** The offer is the run's opening hand, not a floor-exit one. */
+  opening: boolean
 }
 
 /**
@@ -51,7 +53,7 @@ export const localDraft = (
   self: Entity | undefined,
   answeredUntil: number,
 ): LocalDraft => {
-  const out: LocalDraft = { offer: null, seats: [], until: 0, inPlay: false }
+  const out: LocalDraft = { offer: null, seats: [], until: 0, inPlay: false, opening: false }
   for (const e of entities) {
     const ctl = e.playerCtl
     if (!ctl || e.dead || !localIds.has(ctl.playerId)) continue
@@ -61,11 +63,15 @@ export const localDraft = (
       continue
     }
     out.offer ??= hand.offer
+    if (hand.opening) out.opening = true
     out.until = Math.max(out.until, hand.until)
     out.seats.push({ playerId: ctl.playerId, cursor: hand.cursor })
   }
   return out
 }
+
+export const FLOOR_TITLE = 'FLOOR CLEARED — take one mod for your gun'
+export const OPENING_TITLE = 'LANDFALL — take one mod for your gun'
 
 export type DraftLayout = 'full' | 'strip'
 
@@ -78,6 +84,7 @@ export interface DraftScreen {
     secondsLeft: number,
     layout?: DraftLayout,
     loadout?: DraftLoadout,
+    opening?: boolean,
   ): void
   readonly visible: boolean
   readonly layout: DraftLayout
@@ -110,14 +117,14 @@ export const createDraftScreen = (mount: HTMLElement, onPick: (index: number) =>
   let chipRows: HTMLDivElement[] = []
   let timer: HTMLDivElement | null = null
 
-  const build = (cards: readonly DraftCard[]): void => {
+  const build = (cards: readonly DraftCard[], opening: boolean): void => {
     root.replaceChildren()
     const panel = document.createElement('div')
     panelEl = panel
 
     const title = document.createElement('div')
     titleEl = title
-    title.textContent = 'FLOOR CLEARED — take one mod for your gun'
+    title.textContent = opening ? OPENING_TITLE : FLOOR_TITLE
     title.style.cssText = 'font:800 22px system-ui;color:#ffd75e;text-shadow:0 2px 6px #000;text-align:center'
     panel.appendChild(title)
 
@@ -220,7 +227,7 @@ export const createDraftScreen = (mount: HTMLElement, onPick: (index: number) =>
     get layout() {
       return layout
     },
-    update(offer, seats, secondsLeft, next = 'full', loadout) {
+    update(offer, seats, secondsLeft, next = 'full', loadout, opening = false) {
       if (!offer || offer.length === 0 || seats.length === 0) {
         if (shownKey) {
           root.style.display = 'none'
@@ -230,9 +237,11 @@ export const createDraftScreen = (mount: HTMLElement, onPick: (index: number) =>
         return
       }
       const cards = draftCards(offer, loadout)
+      const heading = opening ? OPENING_TITLE : FLOOR_TITLE
+      if (titleEl && titleEl.textContent !== heading) titleEl.textContent = heading
       const key = cards.map((c) => `${c.id}:${c.verdict?.kind ?? 'live'}`).join(',')
       if (key !== shownKey) {
-        build(cards)
+        build(cards, opening)
         shownKey = key
         applyLayout(next)
       } else if (next !== layout) applyLayout(next)

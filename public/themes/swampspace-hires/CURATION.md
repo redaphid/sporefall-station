@@ -660,6 +660,17 @@ thresholds were applied by `scripts/assets/rotoscope/check_idle.py`:
 Known gaps: ne and n are the same frames (the bud is hidden behind the shaft);
 the moss texture and the baked grass pad the critique names are unchanged.
 
+### hive-spire attack clip, 2026-11-06 (needs the action engine: `hiveSpawn`/`hiveSpread` start a drawn `attack`)
+
+8 frames per direction (`char.hivespire.<d>-attack-<n>`), `attack` tpf 2, so 16
+ticks. Same rig (`rig_spire.py --attack`): idle 0, the shaft squashes 3 rows and
+the cap opens 2-3 px, the bud swells to 11 px, falls 26 px down the shaft,
+bursts at the roots in a glow puff, leaves a moss stain, the cap closes, idle 0
+again (frame 7 = idle frame 0). ne/n draw no burst (the roots hide it).
+Checks (`check_idle.py ... attack`): boil .005-.017, identity drift .020-.035,
+head drift .066-.073, coverage jitter .007-.009, colour drift .39-.67%,
+off-palette 0 at 96 and 48, `consistency.py --check` 0 violations (81 frames).
+
 ## props (8), 2026-11-06: the census's C-F props regenerated as colony plumbing kit
 
 Census of all 16 prop files behind the 17 `prop.*` keys at game scale, graded A-F

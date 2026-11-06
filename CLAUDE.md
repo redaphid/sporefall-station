@@ -83,6 +83,16 @@ the image publicly from the Worker (`/review/*`, KV-backed, never in the game
 bundle) and refuses to hand back a URL it hasn't re-fetched as real image bytes.
 Honest contact sheets — failures included — are the point. See `docs/deploy.md` § D.
 
+**A feature is not done until it has a deployed preview.** Build, vitest and lint
+green means "ready for preview", not done. Publish the branch: push it to
+`preview/<name>` or open a PR (`preview-web.yml` builds either), wait for the
+`preview-web` run to go green, then load
+`https://sporefall.hypnodroid.com/betas/<name>/` (a PR's beta is `/betas/pr-<number>/`)
+and check it serves the change. For art, a changed frame's sha256 on the beta matches
+the branch. For behaviour, the feature works in the page. Put the preview branch and
+URL in your report and the PR body. A report without a working preview URL reports
+the feature as unfinished.
+
 **Link the owner to interesting situations.** Every finished feature ships with
 2-5 `?state=<id>` links: playable replays of moments that show the feature off,
 such as the squad breaking when its leader dies, or the player walking into the pillared hall.

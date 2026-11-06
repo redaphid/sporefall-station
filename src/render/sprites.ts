@@ -722,9 +722,9 @@ export class EntityViews {
   /** The slam over a thrown ghost already posed by its track. It keeps the
    * body out of the wall it hit: a body lying on its side is longer than its
    * footprint, so against a side wall or the back of a south wall it is held
-   * off the face by its own reach. Then the squash: in profile (a side wall)
-   * the wall-side edge stays on the face while the far side comes in; face-on
-   * or from behind it splats about its middle. Then the impact burst and the
+   * off the face by its own reach. Then the squash: against a side wall or a
+   * south wall's edge the wall-side edge stays on the face while the far side
+   * comes in; face-on to a north wall it splats about its middle. Then the impact burst and the
    * dust puff on `g.fx`. */
   private slamGhost(g: Ghost, body: BodyTrack, ticks: number, rot: number): void {
     const sl = body.slam!
@@ -749,7 +749,9 @@ export class EntityViews {
     const sq = slamAt(body, ticks)
     if (sq && sq.q !== 0) {
       const m = squashMatrix(rot, g.flip, sq.q, sq.nx, sq.ny)
-      const press = sl.faceX !== undefined ? sq.q * reachToWall(rot, w, h, sq.nx, sq.ny) : 0
+      // A side wall or the back of a south wall: the edge on the face stays.
+      const pressed = sl.faceX !== undefined || sl.ny < 0
+      const press = pressed ? sq.q * reachToWall(rot, w, h, sq.nx, sq.ny) : 0
       s.setFromMatrix(new Matrix(m.a, m.b, m.c, m.d, x - sq.nx * press, y - sq.ny * press))
     } else s.position.set(x, y)
 

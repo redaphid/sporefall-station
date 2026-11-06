@@ -108,7 +108,11 @@ def framing(kf, out):
         rows = np.nonzero((np.abs(a - 255).sum(-1) > 60).sum(1) > 2)[0]
         return int(rows.min()), int(rows.max())
     (t0, b0), (t1, b1) = ext(kf), ext(out)
-    return t1 - t0, b1 - b0, round((b1 - t1) / max(1, b0 - t0), 3)
+    # the legs should not change in an aim edit: mean colour change over the keyframe's lower 40%
+    y = int(t0 + 0.6 * (b0 - t0))
+    A = np.asarray(kf.convert("RGB"))[y:b0 + 1, CROP[0]:CROP[2]].astype(float)
+    B = np.asarray(out.convert("RGB"))[y:b0 + 1, CROP[0]:CROP[2]].astype(float)
+    return t1 - t0, b1 - b0, round((b1 - t1) / max(1, b0 - t0), 3), round(float(np.abs(A - B).mean()), 1)
 
 
 def cmd_paint(a):

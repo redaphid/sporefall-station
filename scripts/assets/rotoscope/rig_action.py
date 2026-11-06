@@ -143,16 +143,16 @@ def scratch(B, period):
         if kind == "rest":
             return J
         # sit back: the rump drops and slides forward, the hips with it; the front stays planted
-        sit = B.proj(f=0.10 * H, u=-0.14 * H)
+        sit = B.proj(f=0.16 * H, u=-0.16 * H)
         for k in ("rump", "hind_near_top", "hind_far_top"):
             J[k] = F[k] + sit
         J["withers"] = F["withers"] + B.proj(u=-0.03 * H)
         for L in ("fore_near_top", "fore_far_top"):
             J[L] = F[L] + B.proj(u=-0.03 * H)
         # the head turns back and down toward the near side, to meet the foot
-        turn = B.proj(f=-0.10 * H, s=0.10 * H, u=-0.08 * H)
+        turn = B.proj(f=-0.16 * H, s=0.10 * H, u=-0.03 * H)
         J["head_top"] = F["head_top"] + turn
-        J["neck"] = F["neck"] + 0.6 * turn
+        J["neck"] = F["neck"] + 0.7 * turn
         for L in ("fore_near", "fore_far", "hind_far"):
             settle(J, L)
         if kind == "sit":

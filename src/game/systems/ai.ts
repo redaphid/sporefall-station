@@ -6,6 +6,7 @@
 // swap the brain.
 
 import { WEAPONS } from '../data/items'
+import { DRAW_REARM_TICKS, NPCS } from '../data/npcs'
 import type { Entity } from '../entity'
 import { hasLineOfSight } from '../los'
 import { isSolidTile } from '../levelgen/level'
@@ -135,6 +136,7 @@ export const aiSystem = (w: World): void => {
       continue
     }
     if ((e.status && (e.status.stun > 0 || e.status.sleep > 0)) || isImmobilized(e)) {
+      trackDraw(w, e)
       e.intent.x = 0
       e.intent.y = 0
       continue
@@ -143,9 +145,37 @@ export const aiSystem = (w: World): void => {
       think(w, e)
       e.ai.thinkAt = w.tick + THINK_INTERVAL + (e.id % 5)
     }
+    trackDraw(w, e)
     steer(w, e, ctx)
   }
 }
+
+/** The engage wind-up (`NpcDef.drawTicks`). Runs once per tick per thinking
+ * body, after anything this tick could have turned it hostile (other systems
+ * last tick, its own think just now) and before steer can pull the trigger.
+ * A fresh engagement pushes the first attack `drawTicks` out; one after less
+ * than DRAW_REARM_TICKS out of aggro keeps the draw it already has (the weapon
+ * never went away). The render's `draw` one-shot follows the same two rules
+ * (render/animTracker.ts), so the first shot lands as the draw clip ends.
+ * Archetypes without a wind-up are never touched. */
+const trackDraw = (w: World, e: Entity): void => {
+  const drawTicks = NPCS[e.archetype]?.drawTicks ?? 0
+  if (drawTicks <= 0) return
+  const ai = e.ai!
+  const d = ai.draw
+  if (ai.mode !== 'aggro') {
+    if (d && d.holsteredAt === undefined) d.holsteredAt = w.tick
+    return
+  }
+  if (!d) ai.draw = { readyAt: w.tick + drawTicks }
+  else if (d.holsteredAt !== undefined) {
+    if (w.tick - d.holsteredAt >= DRAW_REARM_TICKS) d.readyAt = w.tick + drawTicks
+    delete d.holsteredAt
+  }
+}
+
+/** Weapon out: past its engage wind-up (always, for archetypes without one). */
+const drawn = (w: World, e: Entity): boolean => e.ai?.draw === undefined || w.tick >= e.ai.draw.readyAt
 
 const think = (w: World, e: Entity): void => {
   const ai = e.ai!
@@ -613,7 +643,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
       // when `seen`, so range checks and trigger pulls always agree.
       if (seen && dist <= weapon.range * 0.8) {
         e.facing = Math.atan2(dy, dx) + (w.rng.next() - 0.5) * 0.15 // imperfect aim
-        if (e.combat && e.combat.cooldown <= 0) {
+        if (e.combat && e.combat.cooldown <= 0 && drawn(w, e)) {
           // THE shared fire path — mods/elements/pellets apply to NPCs too.
           fireWeapon(w, e)
           e.combat.cooldown += w.rng.int(0, 10) // stagger volleys so they don't fire in lockstep
@@ -632,7 +662,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
       }
     } else if (seen && dist <= weapon.range + target.radius) {
       e.facing = Math.atan2(dy, dx)
-      if (e.combat && e.combat.cooldown <= 0) fireWeapon(w, e) // shared melee swing
+      if (e.combat && e.combat.cooldown <= 0 && drawn(w, e)) fireWeapon(w, e) // shared melee swing
       return
     }
     if (seen) {

@@ -6,11 +6,12 @@
 
 import { describe, expect, it } from 'vitest'
 import type { Entity } from '../game/entity'
+import { NPCS } from '../game/data/npcs'
 import { spawnNpc } from '../game/populate'
 import { spawnPlayer } from '../game/player'
 import { runTicks, walledRoom, worldFromRows } from '../game/testkit'
 import type { World } from '../game/world'
-import { animFrame, DEFAULT_TPF, FIDGET, fidgetGrid, fidgetStart, type AnimStateName } from './animState'
+import { animFrame, DEFAULT_TPF, FIDGET, MAX_ANIM_FRAMES, fidgetGrid, fidgetStart, type AnimStateName } from './animState'
 import { DRAW_REARM_TICKS, trackAnim, type AnimMemory } from './animTracker'
 
 /** A tiny fake pack: 8 drawn frames per action, at the engine's default tpf. */
@@ -85,13 +86,20 @@ const engageTicks = (seen: Seen[]): number[] =>
   seen.filter((s, i) => i > 0 && s.mode === 'aggro' && seen[i - 1].mode !== 'aggro').map((s) => s.tick)
 
 describe('draw — an armed NPC pulls its weapon the tick it engages', () => {
-  it('starts on the engage tick and plays all 8 frames exactly once, even though the sim fires that same tick', () => {
+  it('starts on the engage tick, plays all 8 frames exactly once, and the first shot follows the clip', () => {
     const { seen } = drawScene(PACK)
     const [t0] = engageTicks(seen)
     expect(t0, 'the drowner engaged the player').toBeDefined()
-    // The sim shoots on the engage tick (cooldown rises) — draw still wins.
     const at = seen.findIndex((s) => s.tick === t0)
-    expect(seen[at].cooldown).toBeGreaterThan(seen[at - 1].cooldown ?? 0)
+    // The sim holds fire for the drowner's drawTicks (its engage wind-up), so
+    // no shot lands inside the clip ...
+    expect(NPCS.drowner.drawTicks).toBe(DRAW_TICKS)
+    const fired = (i: number): boolean => (seen[i].cooldown ?? 0) > (seen[i - 1].cooldown ?? 0)
+    expect(seen.slice(at, at + DRAW_TICKS).some((_, k) => fired(at + k))).toBe(false)
+    // ... and the first one comes the tick the clip ends: attack takes over
+    // directly, no frame of draw and attack competing.
+    expect(fired(at + DRAW_TICKS)).toBe(true)
+    expect(`${seen[at + DRAW_TICKS].state}@${seen[at + DRAW_TICKS].start}`).toBe(`attack@${t0 + DRAW_TICKS}`)
     const clip = seen.slice(at, at + DRAW_TICKS)
     expect(clip.map((s) => s.state)).toEqual(Array(DRAW_TICKS).fill('draw'))
     expect(clip.every((s) => s.start === t0)).toBe(true)
@@ -141,6 +149,14 @@ describe('draw — an armed NPC pulls its weapon the tick it engages', () => {
 
   it('is deterministic: the same seed and inputs give the same states and frames', () => {
     expect(drawScene(PACK).seen).toEqual(drawScene(PACK).seen)
+  })
+})
+
+describe('draw — the clip fits the sim wind-up', () => {
+  it('every archetype with a wind-up holds fire for at least a full 8-frame draw at the default tpf', () => {
+    const armed = Object.values(NPCS).filter((d) => (d.drawTicks ?? 0) > 0)
+    expect(armed.map((d) => d.archetype).sort()).toEqual(['acolyte', 'bellwether', 'drowner'])
+    for (const d of armed) expect(d.drawTicks, d.archetype).toBeGreaterThanOrEqual(MAX_ANIM_FRAMES * DEFAULT_TPF.draw)
   })
 })
 

@@ -7,8 +7,12 @@
 // today": the per-tick sprite trace (texture, position, rotation, scale, alpha,
 // held weapon) is recorded from origin/main's renderer and must not move by a
 // bit (stored as per-window sha256 digests). Regenerate only from a checkout of
-// the old code (origin/main at 8ecfd465), never from this branch:
+// the old RENDERER (origin/main at 8ecfd465), never from this branch's:
 //   ACTION_ANIMS_GOLDEN=<path>.json pnpm exec vitest run src/render/actionAnims.views.test.ts
+// The trace runs the real sim, so a sim change moves it legitimately. Then copy
+// this branch's src/game over that checkout first: old renderer, current sim.
+// (Done once: the engage wind-up, NpcDef.drawTicks, delays the drowner's first
+// shot 16 ticks; draw windows from tick 51 moved, window 0 and the kennel not.)
 
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'

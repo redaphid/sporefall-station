@@ -125,10 +125,10 @@ const BASE = chainFor(BASE_THEME_ID)
 const SETTLEMENT = chainFor('settlement')
 
 describe('locomotion follows the drawn body, at the entity layer', () => {
-  it('the swampspace packs draw warden/lurker as fliers (hover) and pod as a sac (pulse)', () => {
+  it('the swampspace packs draw warden as a flier (hover), lurker as a walking beetle (stride) and pod as a sac (pulse)', () => {
     for (const [name, chain] of [['swampspace-hires', HIRES], ['swampspace', BASE]] as const) {
       expect(idleGait(chain, 'warden'), `${name} warden = spore-drone`).toBe('hover')
-      expect(idleGait(chain, 'lurker'), `${name} lurker = gloom-lurker`).toBe('hover')
+      expect(idleGait(chain, 'lurker'), `${name} lurker = gloom-lurker`).toBe('stride')
       expect(idleGait(chain, 'pod'), `${name} pod = brood-sac`).toBe('pulse')
     }
   })
@@ -153,8 +153,8 @@ describe('locomotion follows the drawn body, at the entity layer', () => {
   })
 
   it('an archetype the active pack does not draw moves like the art it falls through to', () => {
-    // settlement maps no lurker, so the chain draws the swampspace gloom-lurker.
-    expect(idleGait(SETTLEMENT, 'lurker')).toBe('hover')
+    // settlement maps no pod, so the chain draws the swampspace brood-sac.
+    expect(idleGait(SETTLEMENT, 'pod')).toBe('pulse')
   })
 
   it('an odd, missing or hostile idle path strides and never throws', () => {

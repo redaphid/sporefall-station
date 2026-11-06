@@ -1,1 +1,1 @@
-export default 'Gloom lurkers are now bubble-back beetles that scuttle in every direction'
+export default 'Gloom lurkers scuttle as bubble-back beetles'

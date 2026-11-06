@@ -17,8 +17,9 @@
  * facing mirror's sign composes outside); `rot` adds to sprite rotation in
  * parent space (visually identical whether or not the sprite is mirrored);
  * `alpha` multiplies the sprite alpha. Only the deliberate hop components
- * (walk bob, waddle rise, attack lunge) ever move `dy` — every other state
- * keeps dy = 0 so the feet never leave the ground.
+ * (walk bob, waddle rise, attack lunge) and the skid's slide along the floor
+ * ever move `dy` — every other state keeps dy = 0 so the feet never leave the
+ * ground.
  *
  * That last sentence holds for `stride`, which is every character with legs and
  * the default for anything not listed in LOCOMOTION. It is deliberately NOT true
@@ -71,14 +72,29 @@ export const MOTION = {
    * over each foot in turn (rot ±rad around the feet) and rising up to `rise` px
    * over the planted one. One rock left and right is two steps. */
   waddle: { rad: 0.13, freq: 0.4, rise: 1 },
-  /** SKID to a stop (the Flashback in-between): the sim halts dead, the
-   * display body leans back against the run for `ticks`, peaking `rise` ticks
-   * in, and braces with a squash. `rad` is the full lean of a profile stop
-   * (scaled by the horizontal part of the run), `squash` the brace of any stop.
-   * A skid cut short (the body moves, swings or is hit) fades over `cutTicks`
-   * instead of snapping upright. `gain` scales the whole move per legged
+  /** SKID to a stop (the Flashback in-between): the sim halts dead, but the
+   * display body slides on `slide` px past the stop over `slideRise` ticks and
+   * eases back onto the sim position by `slideTicks`, while it leans back
+   * against the run (up `rise` ticks, held `hold`, settled by `ticks`) and
+   * braces. `rad` is the full lean of a profile stop (13.75°, scaled by the
+   * sideways part of the run); `squash` the brace of any stop, plus `braceNS`
+   * for the up/down-screen part, where a lean cannot show and the knee-bend is
+   * the read. A skid cut short (the body moves, swings or is hit) fades over
+   * `cutTicks` instead of snapping. `gain` scales the whole move per legged
    * style: a mite's stubby legs skid smaller. */
-  skid: { rad: 0.2, squash: 0.07, rise: 2, ticks: 10, cutTicks: 3, gain: { stride: 1, waddle: 0.6 } },
+  skid: {
+    rad: 0.24,
+    squash: 0.05,
+    braceNS: 0.11,
+    slide: 2.5,
+    slideRise: 2.5,
+    slideTicks: 8,
+    rise: 2,
+    hold: 2,
+    ticks: 9,
+    cutTicks: 3,
+    gain: { stride: 1, waddle: 0.6 },
+  },
 } as const
 
 /** How a character's body carries itself. The 48px canvas is the reason this
@@ -284,25 +300,39 @@ export const composeMotion = (m: MotionInput): MotionPose => {
   // Only bodies with legs skid (hover/pulse have nothing to skid on); a roll is
   // a whole-body tumble and death its own topple.
   if (m.skid !== undefined && legged && m.state !== 'roll' && m.state !== 'death') {
-    const k = skidEnvelope(m.skid, m.t) * MOTION.skid.gain[style === 'waddle' ? 'waddle' : 'stride']
+    const { rad, squash, braceNS, slide } = MOTION.skid
+    const gain = MOTION.skid.gain[style === 'waddle' ? 'waddle' : 'stride']
+    const k = skidEnvelope(m.skid, m.t) * gain
     if (k > 0) {
-      p.rot -= m.skid.dirX * MOTION.skid.rad * k
-      p.sy *= 1 - MOTION.skid.squash * k
-      p.sx *= 1 + MOTION.skid.squash * 0.5 * k
+      const brace = (squash + braceNS * Math.abs(m.skid.dirY)) * k
+      p.rot -= m.skid.dirX * rad * k
+      p.sy *= 1 - brace
+      p.sx *= 1 + brace * 0.5
     }
+    const q = skidSlide(m.skid, m.t) * gain * slide
+    p.dx += m.skid.dirX * q
+    p.dy += m.skid.dirY * q
   }
 
   return p
 }
 
-/** 0..1 strength of a skid at view-time t: a quarter-sine up to the peak at
- * `rise`, a quarter-cosine back to 0 at `ticks` (zero slope at both ends, so it
- * settles into idle without a pop), times a linear fade from `cutAt`. */
-export const skidEnvelope = (s: SkidMotion, t: number): number => {
-  const { rise, ticks, cutTicks } = MOTION.skid
+/** A quarter-sine up to 1 at `rise`, held to `rise + hold`, a quarter-cosine
+ * back to 0 at `end` (zero slope at the end, so it settles without a pop),
+ * times a linear fade from the skid's `cutAt`. */
+const skidShape = (s: SkidMotion, t: number, rise: number, hold: number, end: number): number => {
   const e = t - s.at
-  if (e <= 0 || e >= ticks) return 0
-  const shape = e < rise ? Math.sin((Math.PI / 2) * (e / rise)) : Math.cos((Math.PI / 2) * ((e - rise) / (ticks - rise)))
-  const cut = s.cutAt === undefined ? 1 : 1 - clamp01((t - s.cutAt) / cutTicks)
+  if (e <= 0 || e >= end) return 0
+  const shape =
+    e < rise ? Math.sin((Math.PI / 2) * (e / rise)) : e < rise + hold ? 1 : Math.cos((Math.PI / 2) * ((e - rise - hold) / (end - rise - hold)))
+  const cut = s.cutAt === undefined ? 1 : 1 - clamp01((t - s.cutAt) / MOTION.skid.cutTicks)
   return shape * cut
 }
+
+/** 0..1 strength of a skid's lean and brace at view-time t. */
+export const skidEnvelope = (s: SkidMotion, t: number): number =>
+  skidShape(s, t, MOTION.skid.rise, MOTION.skid.hold, MOTION.skid.ticks)
+
+/** 0..1 of the skid's slide past the stop at view-time t (× MOTION.skid.slide px). */
+export const skidSlide = (s: SkidMotion, t: number): number =>
+  skidShape(s, t, MOTION.skid.slideRise, 0, MOTION.skid.slideTicks)

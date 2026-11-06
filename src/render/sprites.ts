@@ -550,14 +550,14 @@ export class EntityViews {
     const held = heldScale(weaponId)
     const baseX = view.sprite.position.x + Math.cos(e.facing) * kick * hs
     const baseY = view.sprite.position.y + Math.sin(e.facing) * kick * hs
-    // The hand turns with the body's lean around the feet (a skid tips the
-    // whole body back; the weapon keeps its aim but stays in the fist).
+    // The weapon turns with the body's lean around the feet, hand and all (a
+    // skid tips the whole body back, the gun with it).
     const hx = pose.hx * hs
     const hy = pose.hy * hs
     const c = Math.cos(lean)
     const s = Math.sin(lean)
     weapon.position.set(baseX + hx * c - hy * s, baseY + hx * s + hy * c)
-    weapon.rotation = pose.angle
+    weapon.rotation = pose.angle + lean
     // Mirror vertically for the west-half aim so the grip hangs down (never
     // upside-down); the barrel still points along `angle` (y-flip keeps local +x).
     const size = skin.scale * held * hs

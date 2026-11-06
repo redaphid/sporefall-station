@@ -16,13 +16,13 @@ import { arm, runTicks, walledRoom, worldFromRows } from '../game/testkit'
 import type { InputCmd } from '../game/types'
 import { fakeArt, hiveScene, trace, type Frame, type Scene, type TraceOpts } from './animTestkit'
 import { SKID_GATE, trackAnim, type AnimMemory } from './animTracker'
-import { composeMotion, MOTION, skidEnvelope, type MotionInput } from './motion'
+import { composeMotion, MOTION, skidEnvelope, skidSlide, type MotionInput } from './motion'
 import { DUST, skidDust } from './skidDust'
 import { EntityViews } from './sprites'
 
 const ON: TraceOpts = { skid: true }
 const OFF: TraceOpts = { skid: false }
-const { rad, rise, ticks, cutTicks } = MOTION.skid
+const { rad, rise, ticks, cutTicks, slide, slideTicks } = MOTION.skid
 
 /** The 8 compass runs, as stick vectors (screen coords: +y is down/south). */
 const DIRS8: readonly [string, number, number][] = [
@@ -50,6 +50,8 @@ interface RunOpts {
   setup?: (p: Entity, w: Scene['w']) => void
   /** Called before tick i, after the input is set. */
   during?: (i: number, p: Entity) => void
+  /** Aim held throughout (aim-walk); default: aim where you run, then none. */
+  aim?: readonly [number, number]
 }
 
 const RUN0 = 4
@@ -78,9 +80,10 @@ const runStop = (x: number, y: number, o: RunOpts = {}): Scene & { stops: number
       const now = p.pos.x !== p.prevPos.x || p.pos.y !== p.prevPos.y
       if (was && !now) stops.push(w.tick)
       was = now
-      if (i < RUN0) inputs.set(0, STILL)
-      else if (i < RUN0 + run) inputs.set(0, { moveX: x * m, moveY: y * m, aimX: x, aimY: y })
-      else inputs.set(0, { ...STILL, ...o.after?.(i - RUN0 - run) })
+      const aim = o.aim ? { aimX: o.aim[0], aimY: o.aim[1] } : undefined
+      if (i < RUN0) inputs.set(0, { ...STILL, ...aim })
+      else if (i < RUN0 + run) inputs.set(0, { moveX: x * m, moveY: y * m, aimX: x, aimY: y, ...aim })
+      else inputs.set(0, { ...STILL, ...aim, ...o.after?.(i - RUN0 - run) })
       o.during?.(i, p)
     },
   }
@@ -96,7 +99,7 @@ const skidMotion = (at: number, dirX: number, dirY: number) => ({ at, dirX, dirY
 
 describe('a full-speed stop skids, in every direction', () => {
   for (const [name, x, y] of DIRS8) {
-    it(`${name}: leans back against the run for ${ticks} ticks, braced, feet planted, then idles exactly as before`, () => {
+    it(`${name}: slides on past the stop and back, leans back against the run, braced, then idles exactly as before`, () => {
       const sOn = runStop(x, y)
       const on = framesOf(sOn, ON)
       const off = framesOf(runStop(x, y), OFF)
@@ -109,17 +112,19 @@ describe('a full-speed stop skids, in every direction', () => {
         const a = on[i]
         const b = off[i]
         expect(a.tick).toBe(b.tick)
-        // The sim stopped dead and so do the feet: the skid never moves them.
-        expect([a.x, a.y]).toEqual([b.x, b.y])
+        // The sim stopped dead; the display slides on along the run and back.
+        const q = skidSlide(skidMotion(T, dx, dy), a.tick + 0.5) * slide
+        expect(a.x - b.x).toBeCloseTo(dx * q, 10)
+        expect(a.y - b.y).toBeCloseTo(dy * q, 10)
         const k = skidEnvelope(skidMotion(T, dx, dy), a.tick + 0.5)
-        if (k === 0) {
+        if (k === 0 && q === 0) {
           expect(a, `tick ${a.tick} is outside the skid and must match OFF`).toEqual(b)
           continue
         }
         expect(a.tick).toBeGreaterThanOrEqual(T)
-        expect(a.tick).toBeLessThan(T + ticks)
+        expect(a.tick).toBeLessThan(T + Math.max(ticks, slideTicks))
         expect(a.rot - b.rot).toBeCloseTo(-dx * rad * k, 10)
-        expect(Math.abs(a.sy)).toBeLessThan(Math.abs(b.sy)) // the brace
+        if (k > 0) expect(Math.abs(a.sy)).toBeLessThan(Math.abs(b.sy)) // the brace
       }
       // It did skid, and the lean is against the run: head back, feet forward.
       const peak = on.find((f) => f.tick === T + rise)!
@@ -477,6 +482,94 @@ describe('the dust', () => {
     expect(on.slice(T - 1, T - 1 + DUST.ticks).every((g) => g !== undefined)).toBe(true)
     expect(on.slice(T - 1 + DUST.ticks).every((g) => g === undefined)).toBe(true)
     expect(dustAt(false).every((g) => g === undefined)).toBe(true)
+  })
+})
+
+describe('it reads on a phone (the owner-review numbers)', () => {
+  it('peaks at a 12-15 degree lean, slides 2-3 px past the stop, and settles by t+9', () => {
+    expect((rad * 180) / Math.PI).toBeGreaterThanOrEqual(12)
+    expect((rad * 180) / Math.PI).toBeLessThanOrEqual(15)
+    expect(slide).toBeGreaterThanOrEqual(2)
+    expect(slide).toBeLessThanOrEqual(3)
+    const m = skidMotion(0, 1, 0)
+    expect(skidEnvelope(m, ticks)).toBe(0)
+    expect(skidSlide(m, slideTicks)).toBe(0)
+    expect(Math.max(ticks, slideTicks)).toBeLessThanOrEqual(9)
+  })
+
+  it('an up- or down-screen stop squats visibly (a knee-bend of 15%+), a profile stop braces less', () => {
+    const at = (dirX: number, dirY: number): MotionInput & { skid: ReturnType<typeof skidMotion> } => ({
+      state: 'idle', start: 0, tick: 3, t: 3, id: 2, facing: 0, vx: 0, moving: false, drawn: true, skid: skidMotion(0, dirX, dirY),
+    })
+    expect(composeMotion(at(0, 1)).sy).toBeLessThanOrEqual(0.85)
+    expect(composeMotion(at(0, -1)).sy).toBeLessThanOrEqual(0.85)
+    expect(composeMotion(at(1, 0)).sy).toBeGreaterThan(composeMotion(at(0, 1)).sy)
+  })
+
+  it('the dust lands clear of the selection ring, 5-7 px puffs, in every direction', () => {
+    for (const [, x, y] of DIRS8) {
+      const l = Math.hypot(x, y)
+      for (let s = 1; s < DUST.ticks; s++) {
+        for (const p of skidDust({ at: 0, dirX: x / l, dirY: y / l, x: 10, y: 10, speed: 4.5 }, 3, s)) {
+          const ex = (p.x - 320) / (0.22 * 32 + 1)
+          const ey = (p.y - 336) / (0.22 * 32 * 0.52 + 1)
+          expect(ex * ex + ey * ey, `puff at ${p.x},${p.y} sits on the ring`).toBeGreaterThan(1)
+          expect(2 * p.r + 1).toBeGreaterThanOrEqual(5)
+          expect(2 * p.r + 1).toBeLessThanOrEqual(7)
+        }
+      }
+    }
+  })
+})
+
+describe('the held weapon and the gun-hand stops', () => {
+  /** Weapon rotation and position from a Frame's `rot@x,y`. */
+  const weaponOf = (f: Frame): { rot: number; x: number; y: number } => {
+    const [rot, at] = f.weapon!.split('@')
+    const [x, y] = at.split(',').map(Number)
+    return { rot: Number(rot), x, y }
+  }
+
+  it('the held weapon turns with the lean, around the feet, hand and all', () => {
+    const make = (): ReturnType<typeof runStop> => runStop(1, 0, { setup: (p) => void arm(p, 'pistol') })
+    const s = make()
+    const on = framesOf(s, ON)
+    const off = framesOf(make(), OFF)
+    const T = s.stops[0]
+    const i = on.findIndex((f) => f.tick === T + rise + 1)
+    const lean = on[i].rot - off[i].rot
+    expect(Math.abs(lean)).toBeGreaterThan(0.2)
+    const w1 = weaponOf(on[i])
+    const w0 = weaponOf(off[i])
+    expect(w1.rot - w0.rot).toBeCloseTo(lean, 5)
+    // The hand, relative to the feet, is the OFF hand rotated by the lean.
+    const hx = w0.x - off[i].x
+    const hy = w0.y - off[i].y
+    expect(w1.x - on[i].x).toBeCloseTo(hx * Math.cos(lean) - hy * Math.sin(lean), 2)
+    expect(w1.y - on[i].y).toBeCloseTo(hx * Math.sin(lean) + hy * Math.cos(lean), 2)
+  })
+
+  it('run, then fire on the release tick: the shot carries the momentum, no lean, slide or dust at all', () => {
+    // Pinned above too ("a stop into an attack"); here with the aim held, the
+    // way a player shoots the moment they let go of the stick.
+    const make = (): ReturnType<typeof runStop> =>
+      runStop(1, 0, { setup: (p) => void arm(p, 'pistol'), after: (k) => (k < 4 ? { attack: true, aimX: 1, aimY: 0 } : STILL) })
+    expect(diffTicks(framesOf(make(), ON), framesOf(make(), OFF))).toEqual([])
+  })
+
+  it('aim-walk: strafing east while aiming north, then letting go, leans against the RUN (sideways to the gun), the gun with it', () => {
+    // A sidestep stop tips the body sideways, whatever it faces; the gun stays
+    // in the hand and keeps pointing north, turned only by the lean.
+    const make = (): ReturnType<typeof runStop> => runStop(1, 0, { setup: (p) => void arm(p, 'pistol'), aim: [0, -1] })
+    const s = make()
+    const on = framesOf(s, ON)
+    const off = framesOf(make(), OFF)
+    const T = s.stops[0]
+    const i = on.findIndex((f) => f.tick === T + rise + 1)
+    expect(on[i].rot - off[i].rot).toBeCloseTo(-rad, 10)
+    expect(on[i].tex).toMatch(/^player\.n\./) // still the back (north) view
+    expect(on[i].tex).toBe(off[i].tex)
+    expect(weaponOf(on[i]).rot - weaponOf(off[i]).rot).toBeCloseTo(-rad, 5)
   })
 })
 

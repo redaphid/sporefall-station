@@ -17,20 +17,24 @@ import type { Skid } from './animTracker'
 import type { LocomotionStyle } from './motion'
 
 /** THE tunable table, in world pixels and sim ticks. `puffs` per legged style;
- * each flies `reach` px forward (at the player's 4 tiles/s run, scaled by the
- * run's speed), fanned `spread` radians either side of the run, rising `rise`
- * px and swelling to `radius` px as it fades over `ticks`. */
+ * each starts `start` px forward of the feet (clear of the player's selection
+ * ring, 7 x 3.7 px) and flies `reach` px further (at the player's 4.5 tiles/s
+ * run, scaled by the run's speed), fanned `spread` radians either side of the
+ * run, rising `rise` px and swelling from `radius[0]` to `radius[1]` px (5 to
+ * 7 px across) as it fades over `ticks`. A light warm core on a darker rim, so
+ * it separates from grass and steel floors alike. */
 export const DUST = {
-  puffs: { stride: 3, waddle: 2 },
+  puffs: { stride: 4, waddle: 3 },
   ticks: 12,
-  reach: 9,
-  refSpeed: 4,
-  spread: 0.55,
+  start: 11,
+  reach: 10,
+  refSpeed: 4.5,
+  spread: 0.7,
   rise: 3,
-  radius: 2.5,
-  alpha: 0.85,
-  edge: 0x7d7262,
-  core: 0xb9ad94,
+  radius: [2, 3.4],
+  alpha: 0.95,
+  edge: 0x86704f,
+  core: 0xeadcb8,
 } as const
 
 export interface Puff {
@@ -61,18 +65,19 @@ export const skidDust = (skid: Skid, id: number, t: number, style: LocomotionSty
   const fx = skid.x * TILE_PX
   const fy = charFootPx(skid.y, TILE_PX)
   const n = DUST.puffs[style]
-  const reach = DUST.reach * Math.min(1.25, skid.speed / DUST.refSpeed) * (style === 'waddle' ? 0.6 : 1)
+  const scale = style === 'waddle' ? 0.6 : 1
+  const reach = DUST.reach * Math.min(1.25, skid.speed / DUST.refSpeed) * scale
   const out: Puff[] = []
   for (let k = 0; k < n; k++) {
     // Fan the puffs across the run, jittered per stop.
     const lane = (k / (n - 1)) * 2 - 1
     const a = Math.atan2(skid.dirY, skid.dirX) + (lane + (hash(id, skid.at, k) - 0.5) * 0.6) * DUST.spread
-    const d = reach * (0.6 + 0.4 * hash(id, skid.at, k + 7)) * ease
+    const d = DUST.start * scale + reach * (0.6 + 0.4 * hash(id, skid.at, k + 7)) * ease
     out.push({
       x: Math.round(fx + Math.cos(a) * d),
       y: Math.round(fy + Math.sin(a) * d * 0.6 - DUST.rise * ease), // flattened onto the floor, lifting
-      r: Math.max(1, Math.round(1 + (DUST.radius - 1) * ease)),
-      alpha: DUST.alpha * (1 - u) * (1 - u * 0.5),
+      r: Math.max(1, Math.round((DUST.radius[0] + (DUST.radius[1] - DUST.radius[0]) * ease) * scale)),
+      alpha: DUST.alpha * Math.pow(1 - u, 1.2),
     })
   }
   return out

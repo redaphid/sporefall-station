@@ -11,7 +11,7 @@ lore and `CRITIC.md` hard rejects.
 | body plan | cast | motion source | status of the route |
 |---|---|---|---|
 | many legs | mireclaw-stalker, mireclaw-alpha | periodic rig, stick skeleton, Wan 2.2 Fun-Control | proven: stalker seams .07-.14 in all 5 directions |
-| quadruped | carapace-brute, gloam-hound | Wan I2V first; rig + Fun-Control (`rig_quadruped.py`) where a direction misses the seam | proof in this file |
+| quadruped | carapace-brute, gloam-hound | rig + Fun-Control (`rig_quadruped.py`); Wan I2V where a direction already loops | proven on one direction: brute e trot, seam .103 |
 | flyer | spore-drone | rig of a limb stroke (power stroke, recovery) + Fun-Control; never a free Wan hover | not run |
 | stationary spawner | hive-spire (speed 0) | idle from Wan `pulse` (closed loop); actions as one-shots | idle not run; speed 0 is the only rule-13 exemption |
 | pod or crawler | brood-sac | root-leg crawl from a many-leg rig with a wave gait | not run; needs a design Aaron sees first |
@@ -61,7 +61,7 @@ These are renderer changes unless marked. None is made here.
    show anticipation before it. A visible wind-up needs a telegraph field the sim sets before it fires, for
    example `ai.windupUntil`. Until then, attack clips start at the strike.
 
-## One pipeline, five rigs
+## One pipeline, one rig per body plan
 
 Every body plan below runs the same five steps. Each step reads files and writes files, skips its work when its
 output already exists, and is safe to rerun after a crash.
@@ -97,10 +97,10 @@ and foot placement and nothing of the surface, so the keyframe supplies the look
 
 | item | rule |
 |---|---|
-| first route | Wan I2V with the `trot` motion. Gloam-hound take 1 looped s .329, ne .425, n .595 and missed se .711, e 1.252 (PROGRESS 19:38). |
-| fallback, per direction | `rig_quadruped.py --gait trot`: diagonal pairs (near-fore with far-hind), duty 0.5, body dip twice a cycle. `--gait walk` is the four-beat walk for a heavy body (duty 0.7). |
+| why the rig first | Free Wan is a coin toss on four legs. Gloam-hound take 1 (`trot`) looped s .329, ne .425, n .595 and missed se .711, e 1.252 (PROGRESS 19:38). The rig looped brute e at .103 on the first take and .101 on the second. |
+| motion source | `rig_quadruped.py --gait trot`: diagonal pairs (near-fore with far-hind), duty 0.5, body dip twice a cycle. `--gait walk` is the four-beat walk for a heavy body (duty 0.7, not yet run). Keyframes come from `keyframe_probe.py`. |
 | posture | The rig's fit is the target posture, not a trace. A level spine and legs under the shoulders and hips make a runner. A crouch on the keyframe and a straight leg in the rig fight each other; set the rig to the keyframe's posture unless Aaron asked for a new pose. |
-| loop and timing | P16 for a trot. Brute: walk gait, P16-P20, short stride (half stride 35-45 px at 848x480). |
+| loop and timing | P16, half stride 40 px and lift 28 px at 848x480 (brute e). Cut to 8 frames at theme walk tpf 4. |
 | gates | No gate has misjudged a quadruped yet. |
 
 ### Flyer (spore-drone)
@@ -167,7 +167,8 @@ n-idle, and it requires ne and n to show no face. The case:
 `/mnt/d/tmp/cast-walks/gate-case-stalker-n-2026-11-05.md`.
 
 - Symptom: on the stalker's n view, 3-6 of 10 n frames read `toward-viewer` or `na`. The rest of the same loop
-  passes. Four runs: asm3 3 fails, asm4 3, asm5 5, asm6 (rear-mark keyframe) 6.
+  passes. Five runs: asm3 3 fails, asm4 3, asm5 5, asm6 (rear-mark keyframe, small spinnerets) 6, asm7
+  (broad chevrons, `5f36bc79`) 2.
 - The verdict follows the leg phase: byte-identical frames get the same verdict, and adjacent frames of one
   loop get opposite ones.
 - Every other gated character passes 4a on n (bellwether, cinder-husk, gloom-lurker, sporeling-mite on G7).
@@ -182,16 +183,67 @@ How art avoids the failure, in order of cost:
 
 1. Give the back a cue no front has: a tail, a spike, a raised crest that ends in a point at the rear, a pale
    mark on the abdomen tip. Make it at least 6 px at 96 px and outside the leg cloud, so leg phase cannot hide
-   it. The stalker's rear-mark keyframe (chevrons and spinnerets, kf-n4) still failed 6 of 10; its marks sat
-   inside the leg silhouette and were 2-3 px.
+   it. On the stalker, small pale spinnerets (kf-n4 seed 3) still failed 6 of 10 n frames. Broad chevrons
+   (seed 1004) cut the fails to 2 of 10, but the n frames came out .237-.254 heavier than the s-idle, and gate 3
+   fails mass above .22. Add the cue inside the existing silhouette, not as new mass.
 2. Tilt the body: the abdomen higher than the head on n, so the rear fills the top of the silhouette.
 3. Design every new symmetric body with a front-back asymmetry at Step 0 (rule 6 showing). The alpha's raised
    claws give its n view a cue the stalker's does not have.
 
 ## Proof: carapace-brute trot from a rig
 
-Filled in from the run below.
+The riskiest claim in this design is that a hand-posed quadruped rig, drawn as sticks, makes Fun-Control draw a
+four-legged gait on an existing design, and that the clip loops. One direction (e) was run once, on 2026-11-05.
+Gloam-hound was the first target; the coordinator moved it back to its own worker, so the proof uses
+carapace-brute, which no worker had started.
+
+| step | what ran | result |
+|---|---|---|
+| keyframe | `keyframe_probe.py` on the shipped `carapace-brute-s-idle.png`, pose "standing on all four legs ... back level", seeds 3, 11, 23, 1004 | 4 of 4 on-model side views; seed 3 picked (shell over head and shoulders, flank plate, four separate legs, tail) |
+| rig | `rig_quadruped.py examples/quadruped-fit-carapace-brute-e.json --period 16 --stride 40 --lift 28 --gait trot` | 16 skeleton frames; `overlay-00.png` lines up with the keyframe's legs |
+| render | `fun_control.py --glob 'skel-*.png'`, the motion sentence in `examples/moves-quadruped-trot.txt`, seeds 3 and 11 | 81 frames each; GPU 20:29-20:35, about 6 minutes for both |
+| post | `spritesheet.py repack --period 12:64 --size 96 --content 92 --palette-from carapace-brute-s-idle.png` | loop P16, seam .103 (seed 3) and .101 (seed 11), against the gate 1 limit of .5 |
+
+Measured on seed 3 (`loop_measure.py`, `gait_measure.py`):
+
+| number | seed 3 | gate 5 limit or reference |
+|---|---|---|
+| seam at the pick, whole frame | .103 | gate 1: .5 |
+| seam, legs only | .110 | stalker on free Wan: .49-1.78 |
+| identity drift | .058 | .12 |
+| head drift | .030 | .14 |
+| boil | .197 | .3 |
+| sharpness | 835 | 60 minimum |
+| coverage jitter | .030 | .1 |
+| foot lift (first harmonic) | 4.8 px | shipped sporeling-mite e: 4.74 px |
+| leg phase coherence `phase_R` | .063 | near 0 = legs in different phases (a gait); sporeling-mite waddle .763 |
+
+By eye, frame by frame at 5x: each foreleg lifts, folds and reaches forward in turn (frames 0-1 one side, 4-5
+the other), the hind legs swap behind them, the shell and plate keep their shape, and the head stays steady.
+
+Links: [3x GIF](https://2cb.pw/carapace-brute-trot-3x-6d1bff),
+[96 px GIF](https://2cb.pw/carapace-brute-trot-96-8fef94),
+[3x with the floor scrolling under it](https://2cb.pw/carapace-brute-trot-travel-3x-6f0303),
+[8 frames at 3x](https://2cb.pw/carapace-brute-trot-frames-3x-15420b),
+[rig overlay and skeleton](https://2cb.pw/carapace-brute-trot-rig-3e67e8).
+Files: `/mnt/d/tmp/cast-walks/pipeline-1105/` (`kf/`, `rig/`, `fc-brute-e-s3/post/`).
+
+Shortfalls of the proof:
+
+- White backdrop shows through the gaps between the legs in 4 of 8 frames (13-46 white pixels a frame).
+  `spritesheet.pocket_px` returns 0 for this kind, because its anchor is more than `POCKET_PALE` (1%) pale from
+  the bone shell. The GIFs clear white below row 60 (`tools/gifs.py` `unpocket`); `export` would not. Fix at
+  the root before a ship: key pockets only in the leg band, or measure the pale share without the shell.
+- The hind legs are dark and stocky, so their swap reads less than the forelegs' at 96 px.
+- One direction. s, se, ne and n need their own fits; ne and n also need the rear-view rules above.
+- Not exported, not gated. Gates 2, 3, 4, 6 and 6b did not run.
 
 ## What this design did not verify
 
-Filled in from the run below.
+- The flyer stroke, the brood-sac root crawl and the hive-spire rigid-parts actions. No GPU ran for them.
+- Any action clip. The frame counts and the cadence table come from `animState.ts`, not from a render.
+- The engine changes. They are read from the code; none is written or tested.
+- Whether gate 3's foot line holds for a flyer, and whether gate 4a misjudges any body plan other than the
+  many-legged n view.
+- Gloam-hound's crouch. The coordinator withdrew it ("the gait complaint was about a humanoid").
+- The `rig_quadruped.py --gait walk` four-beat gait. Only the trot ran.

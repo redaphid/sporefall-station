@@ -139,10 +139,16 @@ BONES = [("pelvis", "chest", "pelvis", "neck"), ("chest", "neck", "pelvis", "nec
 HEAD_PINNED = ("neck", "head_top", "pelvis", "neck")
 
 
-def retarget(F, S, S0, S1, x, scale, bones=BONES):
-    """One frame: fit F posed by actor frame S, relative to the window's ends S0 (x=0) and S1 (x=1)."""
+def retarget(F, S, S0, S1, x, scale, bones=BONES, plant=False, dip_max=None, travel=1.0, lean=1.0):
+    """One frame: fit F posed by actor frame S, relative to the window's ends S0 (x=0) and S1 (x=1).
+    plant: the feet keep the fit's place (the actor's steps are dropped; the knees take up the dip).
+    dip_max: the pelvis drops at most this many px (an actor who kneels still reads as a crouch).
+    travel: the share of the actor's forward/back pelvis travel kept.
+    lean: the share of the actor's torso turn kept (a generated actor hunches far forward into a crouch;
+    a sprite reads a short lean as weight forward, a long one as falling over)."""
     J = {}
     d_pel = (S["pelvis"] - ((1 - x) * S0["pelvis"] + x * S1["pelvis"])) * scale
+    d_pel = np.array([d_pel[0] * travel, d_pel[1] if dip_max is None else min(d_pel[1], dip_max)])
     J["pelvis"] = F["pelvis"] + d_pel
 
     def turn(a, b):
@@ -150,10 +156,15 @@ def retarget(F, S, S0, S1, x, scale, bones=BONES):
         t0, t1 = ang(S0[b] - S0[a]), ang(S1[b] - S1[a])
         drift = (t1 - t0 + math.pi) % (2 * math.pi) - math.pi
         return (t - t0 - x * drift + math.pi) % (2 * math.pi) - math.pi
+    torso = turn("pelvis", "neck")
     for fa, fb, sa, sb in bones:
-        J[fb] = J[fa] + rot(F[fb] - F[fa], turn(sa, sb))
+        if (sa, sb) == ("pelvis", "neck"):
+            t = lean * torso
+        else:  # a limb keeps its angle to the torso: the torso's turn it loses to `lean`, the limb loses too
+            t = turn(sa, sb) - (1.0 - lean) * torso
+        J[fb] = J[fa] + rot(F[fb] - F[fa], t)
     for w in ("near", "far"):  # ankles pinned (plus the actor's own foot travel), knees by IK
-        d_ank = (S[f"ankle_{w}"] - ((1 - x) * S0[f"ankle_{w}"] + x * S1[f"ankle_{w}"])) * scale
+        d_ank = np.zeros(2) if plant else (S[f"ankle_{w}"] - ((1 - x) * S0[f"ankle_{w}"] + x * S1[f"ankle_{w}"])) * scale
         J[f"ankle_{w}"] = F[f"ankle_{w}"] + d_ank
         J[f"toe_{w}"] = F[f"toe_{w}"] + d_ank
         a = np.linalg.norm(F[f"hip_{w}"] - F[f"knee_{w}"])
@@ -214,6 +225,23 @@ def main():
     ap.add_argument("--slowmo", type=float, default=1.0, help="how much slower than life the capture plays (the "
                                                               "per-frame durations divide by it)")
     ap.add_argument("--hold-last", type=int, default=4, help="ticks the last picked frame lasts")
+    ap.add_argument("--plant", action="store_true", help="feet stay on the fit's place (drop the actor's steps)")
+    ap.add_argument("--dip-max", type=float, help="the deepest pelvis drop, in fit body heights (e.g. .08: a crouch, "
+                                                  "never a kneel)")
+    ap.add_argument("--travel", type=float, default=1.0, help="share of the actor's forward/back pelvis travel kept")
+    ap.add_argument("--lean", type=float, default=1.0, help="share of the actor's torso turn kept")
+    ap.add_argument("--ant", type=int, default=3, help="--plan quick: anticipation frames between rest and the grab")
+    ap.add_argument("--snap", type=int, default=3, help="--plan quick: frames between the grab and the full reach")
+    ap.add_argument("--plan", choices=("motion", "quick"), default="motion",
+                    help="--end aim only. motion: `picks` spreads --frames by travel. quick (the Flashback quickdraw): "
+                         "the actor up to the first full reach (it lands exactly on the aim pose), then a one-frame "
+                         "overshoot (gun hands kicked up past level), a settle and the braced aim; picks rest, 3 "
+                         "anticipation frames to the grab, 2 snap frames, the reach, the overshoot, the settle, aim. "
+                         "Implies --timing quick")
+    ap.add_argument("--timing", choices=("life", "quick"), default="life",
+                    help="life: each frame lasts the actor's own time to the next pick. quick (the Flashback "
+                         "quickdraw, owner 11-06 'lazy, not urgent, limp'): the anticipation 2 ticks a frame, the "
+                         "snap from grab to full reach 1 tick a frame, then the settle 2, 3, ... and --hold-last")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     fit = json.load(open(a.fit))
@@ -253,13 +281,19 @@ def main():
     G = 0.30 * (np.linalg.norm(F["shoulder_near"] - F["elbow_near"]) + np.linalg.norm(F["elbow_near"] - F["hand_near"]))
     def posed(i, s):
         x = 0.0 if to_aim else i / (n - 1)
-        J = {**F, **retarget(F, s, S[0], S[0] if to_aim else S[-1], x, scale, bones)}
+        J = {**F, **retarget(F, s, S[0], S[0] if to_aim else S[-1], x, scale, bones, a.plant,
+                             None if a.dip_max is None else a.dip_max * Hf, a.travel, a.lean)}
         J["gun_on"] = np.array([1.0 if g0 < i < g1 else 0.0, 0.0])
         u = J["hand_near"] - J["elbow_near"]
         u = u / max(np.linalg.norm(u), 1e-6)
         J["gun_rear"] = J["hand_near"] - 0.15 * G * u
         J["gun_muzzle"] = J["hand_near"] + 0.85 * G * u
         return J
+    quick = to_aim and a.plan == "quick"
+    if quick:
+        a.timing = "quick"
+        S = S[: a_in + 1]
+        n = len(S)
     if to_aim:
         R_end = posed(n - 1, S[-1])
         C = {k: J_aim[k] - R_end[k] for k in J_aim if k in R_end and k != "gun_on"}
@@ -271,6 +305,16 @@ def main():
         frames.append(B.layout(J))
     if not to_aim:
         frames.pop()  # the last window frame IS the fit's rest, i.e. frame 0 of the next period
+    if quick:  # overshoot past level, settle, then the braced aim (2 control frames each so the video holds them)
+        def kicked(k):
+            K = dict(J_aim)
+            up = np.array([0.0, -k * Hf])
+            for j, f in (("hand_near", 1.0), ("hand_far", 1.0), ("elbow_near", 0.5), ("elbow_far", 0.5),
+                         ("gun_rear", 1.0), ("gun_muzzle", 1.6)):
+                K[j] = J_aim[j] + f * up
+            return K
+        for k in (0.03, 0.03, 0.014, 0.014, 0.005, 0.005, 0.0):
+            frames.append(B.layout(kicked(k)))
     period = len(frames)
     written = frames + [frames[-1]] * (max(0, a.pad - period) if to_aim else 0)
     for i, f in enumerate(written):
@@ -281,7 +325,14 @@ def main():
     speed = [float(np.abs(pts(frames[nxt(i)]) - pts(frames[i])).sum()) for i in range(a.lead, period)]
     keys = {"rest": a.lead, "grab": a.lead + g0, "aim": a.lead + a_in, "hold": a.lead + a_out, "home": a.lead + g1,
             "end": period}
-    if to_aim:
+    if quick:
+        L = a.lead
+        ant = picks(speed[:g0] + [0.0], L, a.ant + 2, [0, g0])  # rest + --ant between + grab
+        snap = [L + int(round(g0 + (a_in - g0) * f / (a.snap + 1))) for f in range(1, a.snap + 1)]
+        pk = sorted(set(ant + snap)) + [L + a_in, L + a_in + 1, L + a_in + 3, L + a_in + 5, period - 1]
+        keys = {"rest": L, "grab": L + g0, "aim": L + a_in, "overshoot": L + a_in + 1, "settle": L + a_in + 3,
+                "end": period - 1}
+    elif to_aim:
         keys = {"rest": a.lead, "grab": a.lead + g0, "aim": a.lead + a_in, "end": period - 1}
         pk = picks(speed + [0.0], a.lead, a.frames, [0, g0, a_in, n - 1])
     else:
@@ -292,6 +343,22 @@ def main():
     cap = lambda r: float(src_t[min(max(r - a.lead, 0), len(src_t) - 1)])  # noqa: E731
     tick_per_cap = 30.0 / a.fps / a.slowmo
     dur = [max(1, round((cap(pk[k + 1]) - cap(pk[k])) * tick_per_cap)) for k in range(len(pk) - 1)] + [a.hold_last]
+    if quick:  # rest 1 | anticipation 1 a frame, the cocked grab 2 | snap, reach, overshoot 1 | settle 2, 3 | hold
+        g_, r_ = a.lead + g0, a.lead + a_in
+        dur = [1] + [2 if p_ == g_ else 1 for p_ in pk[1:-3]] + [2, 3, a.hold_last]
+    elif a.timing == "quick":
+        g_, r_ = a.lead + g0, a.lead + a_in
+        settle = 2
+        dur = []
+        for k, p_ in enumerate(pk[:-1]):
+            if p_ < g_:
+                dur.append(2)
+            elif p_ < r_:
+                dur.append(1)
+            else:
+                dur.append(settle)
+                settle += 1
+        dur.append(a.hold_last)
     # urgency: capture frames (and seconds of life) from the hand leaving the holster to full reach, peak hand
     # speed in body heights per second of life
     hand = np.array([s["hand_near"] for s in S])

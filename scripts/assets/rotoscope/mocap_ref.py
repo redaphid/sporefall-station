@@ -17,6 +17,7 @@ import glob
 import json
 import os
 import sys
+import time
 import urllib.parse
 
 from PIL import Image
@@ -154,7 +155,10 @@ def cmd_video(a):
 
 def cmd_pose(a):
     frames = sorted(glob.glob(os.path.join(a.clip, "*.png")))
-    tag = os.path.basename(a.clip.rstrip("/"))
+    # A unique prefix per run: SavePoseKpsAsJsonFile numbers files per prefix (_00001, _00002 ...) and the
+    # fetch below reads _00001, so a reused prefix (every take's dir is clip-sN) read an OLD run's
+    # keypoints (11-06: library/draw/e/clip-s3 got ref/clip-s3's).
+    tag = f"{os.path.basename(os.path.dirname(os.path.abspath(a.clip)))}-{os.path.basename(a.clip.rstrip('/'))}-{int(time.time())}"
     names = [S.upload(Image.open(f).convert("RGB"), f"mocap-{tag}-{i:04d}.png") for i, f in enumerate(frames)]
     prefix = f"mocap/pose-{tag}"
     outs = run(pose_graph(names, prefix))

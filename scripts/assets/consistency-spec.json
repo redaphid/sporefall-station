@@ -325,12 +325,12 @@
  "spore-mortar": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 42,
-   "width": 32,
-   "head_h": 30,
-   "mass": 735,
-   "cx": -0.21,
-   "foot_y": 46
+   "height": 44,
+   "width": 34,
+   "head_h": 33,
+   "mass": 829,
+   "cx": -0.27,
+   "foot_y": 45
   },
   "tol": {
    "height": 2,

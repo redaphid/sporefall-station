@@ -93,6 +93,17 @@ the branch. For behaviour, the feature works in the page. Put the preview branch
 URL in your report and the PR body. A report without a working preview URL reports
 the feature as unfinished.
 
+**ALWAYS zoom in and check visual work by eye, for every change that touches what
+the player sees** (sprites, weapons, props, tiles, effects, UI). Owner's rule. A
+scene-scale screenshot, a passing gate, a test or a "the defect is gone" diff is not a
+review. Crop each affected character or object and enlarge it 3-4x with
+nearest-neighbour, in every facing it can show (profile, three-quarter, front, back)
+and every pose it uses (idle, walk, aim, attack), composited the way the game draws
+it. Look at every cell and judge it as a 1990s sprite artist would: silhouette, outline,
+shading, the pixel grid, how it is held or worn, whether it reads as what it is at 1x.
+Put the zoom sheet in your report and the PR body. 11-06 lesson: held pistols passed a
+scene-scale before/after and read as "tiny knives" up close.
+
 **Link the owner to interesting situations.** Every finished feature ships with
 2-5 `?state=<id>` links: playable replays of moments that show the feature off,
 such as the squad breaking when its leader dies, or the player walking into the pillared hall.

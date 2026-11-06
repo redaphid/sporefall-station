@@ -44,8 +44,9 @@ class Crab:
         self.arms = []
         for i in range(a.arms):
             y, tx, tz = -0.3 + 0.4 * i, reach[min(i, len(reach) - 1)], high[min(i, len(high) - 1)]
-            self.arms.append([(a.heap_w * 0.75, y, a.heap_h * 0.3), (tx + 0.35, y - 0.1, tz * 0.45),
-                              (tx + 0.15, y - 0.15, tz * 0.85), (tx - 0.1, y - 0.2, tz)])
+            fw = a.arm_fwd
+            self.arms.append([(a.heap_w * 0.75, y, a.heap_h * 0.3), (tx + 0.35, y - 0.5 * fw, tz * 0.45),
+                              (tx + 0.15, y - 0.75 * fw, tz * 0.85), (tx - 0.1, y - fw, tz)])
         self.sway = a.arm_sway
         self.axis = [(0, -a.heap_l * 1.05, self.body_z * 0.85), (0, -a.heap_l * 0.7, self.body_z + a.heap_h * 0.3),
                      (0, 0.0, self.body_z + a.heap_h * 0.8), (0, a.heap_l * 0.85, self.body_z + a.heap_h * 0.2)]
@@ -137,6 +138,7 @@ def main():
     ap.add_argument("--roll", type=float, default=0.04, help="the shell's side-to-side shift, units")
     ap.add_argument("--arm-reach", default="1.0,1.8", help="each raised limb's tip, units out from the midline")
     ap.add_argument("--arm-len", default="1.7,1.3", help="each raised limb's tip height above the shell's base")
+    ap.add_argument("--arm-fwd", type=float, default=0.2, help="how far forward each raised limb's tip reaches")
     ap.add_argument("--arm-sway", type=float, default=0.08)
     ap.add_argument("--body-z", type=float, default=1.5)
     ap.add_argument("--femur", type=float, default=0.9)

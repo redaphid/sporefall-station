@@ -189,8 +189,9 @@ def cmd_assemble(a):
         if not os.path.lexists(link):
             os.symlink(os.path.realpath(f"{src}/raw/walk-{d}"), link)
     inp = os.path.join(os.path.dirname(base), "input-1024.png")
-    if os.path.exists(inp):
-        shutil.copyfile(inp, os.path.join(os.path.dirname(out), "input-1024.png"))
+    dst_in = os.path.join(os.path.dirname(out), "input-1024.png")
+    if os.path.exists(inp) and os.path.abspath(inp) != os.path.abspath(dst_in):  # base and out often share a parent
+        shutil.copyfile(inp, dst_in)
     json.dump(meta, open(f"{out}/sheet.json", "w"), indent=1)
     ss = [sys.executable, os.path.join(HERE, "spritesheet.py"), "repack"]
     subprocess.run(ss + [out, "--period", a.period], check=True)

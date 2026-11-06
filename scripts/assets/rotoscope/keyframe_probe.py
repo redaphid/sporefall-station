@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Keyframe-only probe: the Qwen-Image-Edit band of spritesheet.video_graph for one direction, N seeds.
-A Step 0 still batch: per RUNBOOK Locks it runs without GPU-WAN.lock. Feeds rig_quadruped/rig_biped + fun_control.
+A Step 0 still batch: per RUNBOOK Locks it may run while another batch holds gpu-run's lock. Feeds rig_quadruped/rig_biped + fun_control.
   python3 keyframe_probe.py <input.png> <dir> <describe.txt> <pose> <out> <seed>...
 Writes <out>/<dir>-kf-s<seed>.png (1280x720) and the pruned graph flow-kf-s<seed>_api.json."""
 import json, os, sys

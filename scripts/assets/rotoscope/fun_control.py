@@ -9,7 +9,7 @@ video model keeps the frames coherent. One direction per call.
       --out /mnt/d/tmp/cast-walks/rnd-multileg/fc-se-s3
 
 Writes <out>/raw/walk-<dir>/NNNN.png (the layout loopscan/partscan/cast_walk read), <out>/control.mp4,
-<out>/flow_api.json. Take GPU-WAN.lock before running; /free after.
+<out>/flow_api.json. Run it under scripts/gpu/gpu-run, which takes the GPU lock and sends /free after.
 """
 import argparse
 import glob

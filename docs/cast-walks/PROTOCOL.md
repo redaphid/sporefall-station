@@ -36,9 +36,10 @@ Files in this folder:
    that hovers, pulses or has many legs is R&D with a hard 1-hour cap, never ahead of humanoids.
    On 09-29 the drone and the stalker ate ~2 h each and shipped nothing.
    **The GPU is never idle** (Aaron, 09-29 09:46: "The GPU should literally never be idle"). Always
-   keep one character staged (Step 0 done on CPU, waiting on `GPU-WAN.lock`) behind the one on the
+   keep one character staged (Step 0 done on CPU, queued in `scripts/gpu/gpu-run`) behind the one on the
    GPU. The coordinator runs an idle watchdog (util < 15% for 60 s alerts) and answers every alert
-   by staging work. A lock holder with no GPU process is released by the coordinator.
+   by staging work. The watchdog and the coordinator never release a lock: `gpu-run` frees it when
+   the batch ends (rule: `docs/owner-pc-ops.md` "Sharing the GPU between workers").
 3. **Workers fix what they find, except a gate.** A script bug or a wrong
    default is fixed at its root by whoever finds it. They prove the fix (a
    test, or a before/after run), commit, push, and report the finding in one

@@ -1,6 +1,6 @@
 # Rule 14 case: gate 4a's one-image "facing" question on a faceless front (bog-mender)
 
-Status: **proposed, not applied**. The gate is unchanged (938319cdcc807028, G7). The bog-mender worker wrote this case on 2026-11-06 and stopped the s direction.
+Status: **proposed, not applied**. The gate is unchanged (938319cdcc807028, G7). The bog-mender worker wrote this case on 2026-11-06 and stopped the s direction. Round 2 tried the art-side route (a lit visor slit, see the last section): 4a went from 3/50 to 1/50 but still fails.
 
 ## Symptom
 
@@ -36,6 +36,25 @@ For s and se, fail on `facing == away` only when the reference check does not re
 
 Before applying it, run `cast_gate_selftest.py`. Its back-view negative control for s must still fail through `view`.
 
-## Art-side alternative (rule 14: try a better route first)
+## Art-side route tried (round 2, 2026-11-06): a lit visor slit, and 4a still fails
 
-Give the front a face cue that one image can read, such as a thin lit amber slit in the visor (the design sheet's seed 23 drew one). It uses the same hue as the chest port, so G3 still has one accent. This means retaking s and se (and e to match), followed by a second gate run. The brief allowed one gate run, so this was not attempted.
+Rule 14 asks for a better art route before a gate change, so round 2 gave the front a face cue that one image can read.
+
+- A short lit amber slit was painted into the visor band of the take1 s, se and e keyframes: two 8 px block rows, a yellow core (240,224,64) with an orange rim (224,96,32). These are the chest port's own hues, so G3 still has one accent. Script: `/mnt/d/tmp/cast-walks/bog-mender/slit-1106/tools/paint_slit.py`.
+- Wan take3 (seed 3) ran from those keyframes with `--keyframe`, giving seams s .289, se .276 and e .308. At 96 px the slit is 2 px tall and lit in every s, se and e frame.
+- ne was also redrawn as a true three-quarter back. It is faceless and was rendered by skeleton Fun-Control (seam .127).
+
+The one gate run on export d52fdce5 (gate 938319cdcc807028, G7) scored 8/9 again. 4a now fails on **1 of 50** frames (3 of 50 before):
+
+> bog-mender-s-step.png subj='robot' facing=away: 's' sprite reads as facing away
+
+A diagnostic run of `verify.py` used the gate's own job (`char.bog-mender.s-idle`) and the same model. The gate itself was unchanged.
+
+| frame | facing (one image) | view (against s-idle + n-idle) | result |
+|---|---|---|---|
+| s-step | away | side | FAIL |
+| s-walk-0 | toward-viewer | front | ok |
+
+The lit slit and the chest port are both plainly visible on s-step (4x zoom: https://2cb.pw/s-step-zoom-144b59). Sheet: https://2cb.pw/contact-96-vs-frog-settler-8c12bf. GIF: https://2cb.pw/walk-96-vs-frog-settler-b1dc23.
+
+The added face cue moved the one-image answer on most frames, but not on all of them. One frame with a lit visor and a lit chest port still reads "away". The proposed change still covers it: `view` returns side here, which an s frame is allowed to be. The art route has been tried, and the worker has stopped. The decision belongs to Aaron.

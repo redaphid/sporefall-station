@@ -157,7 +157,9 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     bulletGlow: () => inner.bulletGlow(),
     themedBullet: () => inner.themedBullet(),
     animTpf: (s) => inner.animTpf(s),
-    weaponTexture: (id) => inner.weaponTexture(id),
+    heldWeapon: (id) => inner.heldWeapon(id),
+    fistOf: (f) => inner.fistOf(f),
+    fistCap: (f, b) => inner.fistCap(f, b),
   }
   const world = new Container()
   const tilemap = new TilemapView()
@@ -389,14 +391,18 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     thumbs.set(artKey, url)
     return url
   }
-  // Loadout-panel weapon pictures: weapon id → data URL, extracted from the live
-  // procedural weapon art (art.weaponTexture). Same cache discipline as thumbs.
+  // Loadout-panel weapon pictures: weapon id → data URL, extracted from the
+  // pack's held-weapon art (its profile idle frame). Same cache discipline as
+  // thumbs; a weapon no pack draws gets the panel's glyph.
   const weaponThumbs = new Map<string, string | undefined>()
   const weaponThumb = (weaponId: string): string | undefined => {
     if (weaponThumbs.has(weaponId)) return weaponThumbs.get(weaponId)
     let url: string | undefined
+    const art = inner.heldWeapon(weaponId)
+    const tex = (art?.e ?? art?.se ?? art?.s)?.idle[0]
     try {
-      const canvas = app.renderer.extract.canvas(inner.weaponTexture(weaponId)) as HTMLCanvasElement
+      if (!tex) throw new Error('no held art')
+      const canvas = app.renderer.extract.canvas(tex) as HTMLCanvasElement
       url = typeof canvas.toDataURL === 'function' ? canvas.toDataURL() : undefined
     } catch {
       url = undefined // headless/degraded contexts: the panel falls back to a glyph

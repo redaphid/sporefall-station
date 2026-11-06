@@ -37,15 +37,11 @@ SKIP = {
     "scripts/rename-weapon-ids.py",
     "src/game/data/loreWeapons.test.ts",  # names the old ids on purpose
     "scripts/codemods/lore-names.json",  # an earlier codemod's own old->new map
-    # Held-weapon drawing classes are named 'pistol'/'blade'/...: class names, not
-    # weapon ids. Their id->class table is edited by hand.
-    "src/render/weaponSprites.ts",
-    "src/render/heldWeapon.views.test.ts",
 }
 SKIP_DIRS = ("scripts/assets/",)
 OLD = "|".join(sorted(RENAMES, key=len, reverse=True))
 QUOTED = re.compile(rf"(['\"`])({OLD})(['\"`])")
-DOTTED = re.compile(rf"\b(pickup|WEAPONS|item|weapons)\.({OLD})\b")
+DOTTED = re.compile(rf"\b(pickup|WEAPONS|item|weapons|weapon)\.({OLD})\b")
 KEY = re.compile(rf"(^|[\s{{,])({OLD})(\s*:)")
 
 

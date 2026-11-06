@@ -103,8 +103,6 @@ describe('no source file still names a removed weapon id', () => {
   const ALLOW = new Set([
     'src/game/data/loreWeapons.test.ts',
     'src/net/protocol/messages.ts', // RETIRED wire entries, append-only
-    'src/render/weaponSprites.ts', // drawing classes named 'pistol'/'blade', not weapon ids
-    'src/render/heldWeapon.views.test.ts',
   ])
   const files: string[] = []
   const walk = (dir: string) => {
@@ -115,7 +113,7 @@ describe('no source file still names a removed weapon id', () => {
     }
   }
   walk(join(ROOT, 'src'))
-  const pattern = new RegExp(`(['"\`])(${REMOVED.join('|')})\\1|pickup\\.(${REMOVED.join('|')})\\b|WEAPONS\\.(${REMOVED.join('|')})\\b`)
+  const pattern = new RegExp(`(['"\`])(${REMOVED.join('|')})\\1|pickup\\.(${REMOVED.join('|')})\\b|(WEAPONS|weapon)\\.(${REMOVED.join('|')})\\b`)
 
   it('finds none outside the allow-list', () => {
     const hits: string[] = []

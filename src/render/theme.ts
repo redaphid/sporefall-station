@@ -9,6 +9,7 @@
  */
 
 import { ANIM_STATES, DEFAULT_TPF, MAX_ANIM_FRAMES, type AnimStateName } from './animState'
+import { WEAPONS } from '../game/data/items'
 
 // The hi-res Sporefall Station pack (artScale 2 — themeLoader bakes it at
 // double texture density over the same logical sizes) is the default theme.
@@ -115,6 +116,43 @@ export const TILE_NAMES = [
  * art itself must then carry no cap. */
 export const WALL_CAP_NAMES = ['wall', 'hull'] as const
 
+// ---------------------------------------------------------------------------
+// Held-weapon art (docs/themes.md "Held weapons"). A pack draws each carried
+// weapon per VIEW (the way it points on screen: e profile, se 3/4 down-forward,
+// s at the camera, ne 3/4 up-away, n away; the west half is these mirrored)
+// as two clips: `idle` (a loop while held) and `attack` (a one-shot spread
+// over the attack window: the shot or the swing). Key grammar:
+//   weapon.<id>.<view>-<state>-<n>    n contiguous from 0
+// Frames are authored on the pack's character pixel grid (artScale) and drawn
+// unscaled. The grip and muzzle pixels of each view live in the manifest's
+// `weapons` section. A weapon a pack does not draw is not drawn at all.
+
+/** The weapon views a pack draws. */
+export type WeaponView = 'e' | 'se' | 's' | 'ne' | 'n'
+export const WEAPON_VIEWS: readonly WeaponView[] = ['e', 'se', 's', 'ne', 'n']
+/** A missing view borrows a neighbour (first entry is the view itself). */
+export const WEAPON_VIEW_FALLBACK: Record<WeaponView, readonly WeaponView[]> = {
+  e: ['e'],
+  se: ['se', 'e'],
+  s: ['s', 'se', 'e'],
+  ne: ['ne', 'e'],
+  n: ['n', 'ne', 'e'],
+}
+export type WeaponState = 'idle' | 'attack'
+export const WEAPON_STATES: readonly WeaponState[] = ['idle', 'attack']
+/** Weapon ids that can carry held art: every carried (non-natural) weapon. */
+export const HELD_WEAPON_IDS: readonly string[] = Object.values(WEAPONS)
+  .filter((w) => w.natural !== true)
+  .map((w) => w.id)
+
+/** One view's pinned pixels, in its frames' own pixels (origin top-left). */
+export interface WeaponPoints {
+  /** Pixel that sits under the wielder's fist. */
+  grip: readonly [number, number]
+  /** Muzzle (gun) or head (melee): where a mod glow centres. Grip when absent. */
+  muzzle: readonly [number, number]
+}
+
 /** tile.* sprite keys accept a single path OR an array: the array's entries are
  * VARIANTS the tilemap alternates deterministically by tile coordinate, so big
  * surfaces read as texture instead of one repeated stamp. `tile.<name>.accent`
@@ -149,6 +187,10 @@ const buildSpriteKeys = (): Set<string> => {
   for (const i of ITEM_IDS) keys.add(`item.${i}`)
   for (const p of PROP_NAMES) keys.add(`prop.${p}`)
   for (const k of FX_KEYS) keys.add(k)
+  for (const id of HELD_WEAPON_IDS)
+    for (const v of WEAPON_VIEWS)
+      for (const s of WEAPON_STATES)
+        for (let n = 0; n < MAX_ANIM_FRAMES; n++) keys.add(`weapon.${id}.${v}-${s}-${n}`)
   return keys
 }
 
@@ -189,6 +231,8 @@ export interface ThemeManifest {
    * layout, camera, or the sim. The sole knob that distinguishes the hi-res
    * theme from the base one. */
   artScale: number
+  /** Held-weapon grip/muzzle pixels per weapon id and view. */
+  weapons: Record<string, Partial<Record<WeaponView, WeaponPoints>>>
 }
 
 /** A manifest bound to the folder it loaded from (dir is app-root-relative,
@@ -212,6 +256,7 @@ export const emptyManifest = (): ThemeManifest => ({
   anim: {},
   macroTiles: {},
   artScale: 1,
+  weapons: {},
 })
 
 // ---------------------------------------------------------------------------
@@ -374,6 +419,42 @@ const validateAnim = (raw: unknown, warn: (w: string) => void): ThemeManifest['a
   return out
 }
 
+const isPixel = (v: unknown): v is [number, number] =>
+  Array.isArray(v) && v.length === 2 && v.every((n) => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n < 512)
+
+const validateWeapons = (raw: unknown, warn: (w: string) => void): ThemeManifest['weapons'] => {
+  const out: ThemeManifest['weapons'] = {}
+  if (raw === undefined) return out
+  if (!isRecord(raw)) {
+    warn('weapons: expected an object of weapon id → view → { grip, muzzle }')
+    return out
+  }
+  for (const [id, views] of Object.entries(raw)) {
+    if (FORBIDDEN_KEYS.has(id) || !HELD_WEAPON_IDS.includes(id)) {
+      warn(`weapons: unknown or natural weapon "${id}" dropped (known: ${HELD_WEAPON_IDS.join(' ')})`)
+      continue
+    }
+    if (!isRecord(views)) {
+      warn(`weapons.${id}: expected an object of view → { grip, muzzle }`)
+      continue
+    }
+    const pts: Partial<Record<WeaponView, WeaponPoints>> = {}
+    for (const [view, v] of Object.entries(views)) {
+      if (!(WEAPON_VIEWS as readonly string[]).includes(view)) {
+        warn(`weapons.${id}: unknown view "${view}" dropped (known: ${WEAPON_VIEWS.join(' ')})`)
+        continue
+      }
+      if (!isRecord(v) || !isPixel(v.grip) || (v.muzzle !== undefined && !isPixel(v.muzzle))) {
+        warn(`weapons.${id}.${view}: expected { grip: [x, y], muzzle?: [x, y] } in whole pixels`)
+        continue
+      }
+      pts[view as WeaponView] = { grip: v.grip, muzzle: isPixel(v.muzzle) ? v.muzzle : v.grip }
+    }
+    out[id] = pts
+  }
+  return out
+}
+
 /** Coerce arbitrary JSON into a safe, normalized manifest. Collects a warning
  * per dropped/defaulted field; never throws. */
 export const validateManifest = (raw: unknown): ValidatedManifest => {
@@ -397,12 +478,13 @@ export const validateManifest = (raw: unknown): ValidatedManifest => {
   manifest.sprites = validateSprites(raw.sprites, warn)
   manifest.anim = validateAnim(raw.anim, warn)
   manifest.macroTiles = validateMacroTiles(raw.macroTiles, warn)
+  manifest.weapons = validateWeapons(raw.weapons, warn)
   if (raw.artScale !== undefined) {
     if (typeof raw.artScale === 'number' && Number.isInteger(raw.artScale) && raw.artScale >= 1 && raw.artScale <= 4)
       manifest.artScale = raw.artScale
     else warn(`artScale: expected an integer 1..4, got ${JSON.stringify(raw.artScale)}; using 1`)
   }
-  const known = new Set(['id', 'name', 'version', 'palette', 'names', 'sprites', 'anim', 'macroTiles', 'artScale'])
+  const known = new Set(['id', 'name', 'version', 'palette', 'names', 'sprites', 'anim', 'macroTiles', 'artScale', 'weapons'])
   for (const k of Object.keys(raw)) if (!known.has(k)) warn(`manifest: unknown key "${k}" dropped`)
   return { manifest, warnings }
 }
@@ -482,6 +564,15 @@ export const resolveMacroTiles = (chain: ThemeChain): Record<string, number> => 
   const out: Record<string, number> = {}
   for (const theme of [...chain].reverse()) Object.assign(out, theme.manifest.macroTiles)
   return out
+}
+
+/** A weapon view's grip/muzzle: the first theme in the chain that pins it. */
+export const resolveWeaponPoints = (id: string, view: WeaponView, chain: ThemeChain): WeaponPoints | undefined => {
+  for (const theme of chain) {
+    const v = theme.manifest.weapons[id]?.[view]
+    if (v) return v
+  }
+  return undefined
 }
 
 /** Merge the chain's palettes: per field/key, the first theme that sets it wins. */

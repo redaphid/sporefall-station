@@ -1,109 +1,119 @@
-// The held-weapon POSE — where the weapon sits in the wielder's hand and how it
-// swings on attack. Layer-2 of the weapon layer (mirrors motion.ts for the body):
-// a PURE function of the CONTINUOUS aim + the drawn facing + the sim-derived
-// attack progress, so the pose is deterministic and replay-stable (same tick →
-// same angle on every device). No pixi, no DOM, no wall clock, no randomness —
-// unit-testable in full.
+// The held-weapon POSE: which pre-drawn weapon drawing a wielder shows, which
+// way it is mirrored, and whether it sits in front of or behind the body.
+// Pure (no pixi, no DOM, no clock, no randomness) and a function of
+// sim-derived signals only, so every device and every replay draws the same
+// frame.
 //
-// Aim is CONTINUOUS. The weapon rotates to the wielder's exact aim heading
-// (`entity.facing`, radians, screen +x right / +y down) — the SAME signal the
-// twin-stick reticle and the fired bullet both use (movement.ts sets
-// `facing = atan2(aimY, aimX)`; combat fires along `facing`). So the muzzle
-// points down the aim line, for the full 360° INCLUDING straight down, decoupled
-// from the body's 8-way sprite quantization. The body sprite stays quantized
-// (only 8 drawn facings exist); only the hand PLACEMENT borrows that quantized
-// facing, never the weapon's rotation.
-//
-// Attack progress `p` is (tick − attackStart) / STATE_TICKS.attack — the SAME
-// clock the body's attack lunge reads (motion.ts). At rest (no attack, or p
-// outside [0,1)) the weapon points exactly at the aim. During the window a
-// melee weapon sweeps an arc ON TOP of that aim and returns exactly to it at p=1.
+// A weapon is pixel art (weaponSprites.ts), so it is never rotated freely:
+// rotating a 15px pistol by an arbitrary angle resamples it into a grey
+// sliver. Instead the compass is split into eight 45° sectors and each sector
+// has its own drawing (five drawn, the west three mirrored), the way a 16-bit
+// sprite sheet carries a frame per direction. The body itself is drawn in the
+// same eight directions, so the weapon's sector is the body's facing when it
+// aims, one sector further down when it is at low-ready, and a short run of
+// sectors for a melee chop.
 
 import type { Dir } from './anim'
+import type { WeaponView } from './theme'
 
-/** Peak arc the weapon sweeps through mid-swing, in radians. Chosen wide enough
- * to read as a decisive swing at gameplay zoom, short enough to stay on-canvas. */
-export const SWING_ARC = 1.8
+/** The compass ring, clockwise on screen (+y is down): index 0 points east. */
+export const RING = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne'] as const
 
-/** Per-drawn-direction hand rig — WHERE the grip pins to the body. `hx/hy` place
- * the grip relative to the sprite's FEET anchor (canvas px: +x right of centre,
- * +y DOWN from the feet — so hy is negative, up at hand height). Only the hand
- * PLACEMENT is quantized to the 8 drawn facings; the weapon's rotation follows
- * the continuous aim independently (see `weaponPose`). */
-interface HandRig {
-  hx: number
-  hy: number
+const RING_OF_DIR: Record<Dir, number> = { e: 0, se: 1, s: 2, ne: 7, n: 6 }
+
+/** Ring index → the drawing that points that way and whether it is mirrored. */
+const DRAWING: readonly (readonly [WeaponView, boolean])[] = [
+  ['e', false],
+  ['se', false],
+  ['s', false],
+  ['se', true],
+  ['e', true],
+  ['ne', true],
+  ['n', false],
+  ['ne', false],
+]
+
+const wrap = (i: number): number => ((i % 8) + 8) % 8
+
+/** The body's facing as a ring index (the west half is the east art mirrored). */
+export const facingSector = (dir: Dir, flip: boolean): number => {
+  const i = RING_OF_DIR[dir]
+  return flip ? wrap(4 - i) : i
 }
 
-/** The five DRAWN facings (west half is these mirrored). Measured off the hands
- * the swampspace-hires ranger and drowned diver actually draw in their idle
- * frames (96px art, halved to these 48px units): front and back views hold the
- * hand ~8-10px out from the centre line, the east profile lets it hang at the
- * hip, ~0-2px. The old rig put the east grip 12px out, in mid-air in front of a
- * profile body; a canvas-sized weapon hid that, a hand-sized one does not. */
-export const HAND_RIG: Record<Dir, HandRig> = {
-  s: { hx: 9, hy: -18 },
-  se: { hx: 8, hy: -20 },
-  e: { hx: 2, hy: -20 },
-  ne: { hx: 8, hy: -19 },
-  n: { hx: 8, hy: -19 },
+/** A chop in four beats over the attack window, as sector steps from the
+ * facing toward "forward-down": raised overhead, coming over, striking along
+ * the facing, follow-through (which is also the melee rest pose). */
+export const SWING_STEPS = [-2, -1, 0, 1] as const
+
+/** Ticks a wielder keeps its weapon up after an attack before it lowers to
+ * low-ready again (1.5 s). */
+export const AIM_HOLD_TICKS = 45
+
+export interface HoldInput {
+  /** Drawn body facing and its west-half mirror (anim.facingDir). */
+  dir: Dir
+  flip: boolean
+  /** A gun (aims and recoils) rather than a melee weapon (chops). */
+  ranged: boolean
+  /** Weapon up: a gun held level along the facing. Otherwise low-ready. */
+  aiming: boolean
+  /** Attack progress in [0,1) over the attack window, or undefined at rest. */
+  progress?: number
 }
 
-const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
-
-/** Swing envelope over progress p ∈ [0,1]: 0 at rest, rising to a peak of 1 at
- * mid-window, back to 0 at the end — a struck arc that returns to the aim hold.
- * sin(πp), the same out-and-back envelope the body's attack lunge uses, so the
- * weapon and the body move in lockstep. Monotonic increasing on [0, 0.5]. */
-export const swingSweep = (p: number): number => Math.sin(clamp01(p) * Math.PI)
-
-export interface WeaponPose {
-  /** Hand grip offset from the feet anchor (canvas px), mirror already applied. */
-  hx: number
-  hy: number
-  /** Weapon rotation in screen radians — the aim heading with any swing folded
-   * in. The sprite's local +x (its barrel/blade) points along this. */
-  angle: number
-  /** Mirror the weapon sprite VERTICALLY (scale.y < 0). Set when aiming into the
-   * left half so the grip keeps hanging DOWN (never upside-down) and the sprite
-   * matches the body's west-half mirror. The barrel still points along `angle`
-   * (a y-flip leaves the local +x axis untouched). */
-  flipY: boolean
-  /** Draw the weapon behind the body (aiming up/away, into the north hemisphere). */
+export interface HeldPose {
+  /** Ring index the drawing points along. */
+  sector: number
+  view: WeaponView
+  /** Mirror the drawing horizontally (scale.x = -1); never any other scale. */
+  mirror: boolean
+  /** Draw behind the body: the wielder faces away (ne/n), so the arm and the
+   * weapon are on the far side of it. */
   behind: boolean
+  /** Redraw the wielder's own fist over the grip. Off behind the body (the body
+   * already covers it) and for a weapon pointed at the camera, whose muzzle is
+   * nearer the viewer than the hand. */
+  cap: boolean
 }
 
-/**
- * The held-weapon pose.
- * @param aim   CONTINUOUS aim heading in screen radians (`entity.facing`) — the
- *              weapon points exactly here (full 360°, incl. straight down).
- * @param dir   drawn body facing (s/se/e/ne/n) — used ONLY to place the hand.
- * @param progress attack progress (tick−start)/STATE_TICKS.attack, or undefined /
- *                 outside [0,1) for the idle hold (weapon points at aim, no swing)
- * @param flip  true for the mirrored west half — mirrors hx AND flips the sprite
- *              vertically (the same mirror the body uses), so the grip stays down.
- */
-export const weaponPose = (aim: number, dir: Dir, progress: number | undefined, flip: boolean): WeaponPose => {
-  const rig = HAND_RIG[dir]
-  const swinging = progress !== undefined && progress >= 0 && progress < 1
-  const sweep = swinging ? swingSweep(progress) : 0
-  // Compose the swing arc ON TOP of the aim (idle = points at aim). On the
-  // mirrored (west) side the sprite is y-flipped, which reverses the visual sense
-  // of rotation — so negate the sweep there to keep the chop reading identically
-  // left and right. At rest (sweep = 0) the angle is exactly the aim.
-  const swingSign = flip ? -1 : 1
-  return {
-    hx: flip ? -rig.hx : rig.hx,
-    hy: rig.hy,
-    angle: aim + swingSign * SWING_ARC * sweep,
-    flipY: flip,
-    behind: Math.sin(aim) < 0, // aim points up/north (screen −y) → tuck behind
-  }
+/** The held-weapon pose. */
+export const heldPose = ({ dir, flip, ranged, aiming, progress }: HoldInput): HeldPose => {
+  const f = facingSector(dir, flip)
+  // "Forward-down" turns clockwise on the east half, counter-clockwise on the west.
+  const down = flip ? -1 : 1
+  const swinging = !ranged && progress !== undefined && progress >= 0 && progress < 1
+  const step = swinging ? SWING_STEPS[Math.min(3, Math.floor(progress * 4))] : ranged && aiming ? 0 : 1
+  const sector = wrap(f + down * step)
+  const [view, drawnMirror] = DRAWING[sector]
+  // s and n drawings face the camera; they take the body's own mirror.
+  const mirror = view === 's' || view === 'n' ? flip : drawnMirror
+  const behind = dir === 'ne' || dir === 'n'
+  return { sector, view, mirror, behind, cap: !behind && view !== 's' }
 }
 
-/** Ranged recoil kick along the aim (screen px), out-and-back over the attack
- * window — a small nudge so guns punch rather than swing. 0 at rest / outside
- * the window. Melee never uses this (it swings instead). */
-export const RECOIL_PX = 3
+/** Is the wielder's weapon up? An NPC engaged with a target, anyone who
+ * attacked in the last AIM_HOLD_TICKS, or a player strafing (moving one way,
+ * facing another: the twin-stick aim). */
+export const isAiming = (s: { engaged: boolean; ticksSinceAttack?: number; strafing: boolean }): boolean =>
+  s.engaged ||
+  s.strafing ||
+  (s.ticksSinceAttack !== undefined && s.ticksSinceAttack >= 0 && s.ticksSinceAttack < AIM_HOLD_TICKS)
+
+/** Fallback hand position per drawn facing when the frame carries no measured
+ * fist (procedural bodies, a pack without anchors): the grip's offset from the
+ * feet anchor in 48-unit character px (+x right, +y down). */
+export const HAND_RIG: Record<Dir, { hx: number; hy: number }> = {
+  s: { hx: 8, hy: -20 },
+  se: { hx: 7, hy: -21 },
+  e: { hx: -3, hy: -20 },
+  ne: { hx: 7, hy: -20 },
+  n: { hx: 8, hy: -20 },
+}
+
+/** Ranged recoil: the gun punches back this many character px at the peak of
+ * the attack window (sin envelope), 0 at rest. The renderer snaps it to the
+ * art grid. */
+export const RECOIL_PX = 2
 export const recoilKick = (progress: number | undefined): number =>
-  progress !== undefined && progress >= 0 && progress < 1 ? -RECOIL_PX * swingSweep(progress) : 0
+  progress !== undefined && progress >= 0 && progress < 1 ? -RECOIL_PX * Math.sin(progress * Math.PI) : 0

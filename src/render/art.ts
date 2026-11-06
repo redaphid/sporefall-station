@@ -1,7 +1,7 @@
 import { Container, Graphics, Rectangle, Sprite, Texture, type Renderer } from 'pixi.js'
 import { isWallTile, Tile, WALL_CUT_OUTSIDE } from '../game/levelgen/level'
 import { modPickupColor } from './modColors'
-import { WEAPON_CANVAS, weaponShape, type WeaponShape } from './weaponArt'
+import type { WeaponView } from './theme'
 import { DEFAULT_TPF, type AnimStateName } from './animState'
 import { DIRS5, type Dir5 } from './theme'
 import { pickTileVariant } from './tileSelect'
@@ -102,14 +102,46 @@ export interface ArtRegistry {
   /** Cadence (sim ticks per frame) for an animation state — theme override or
    * the engine default. */
   animTpf(state: AnimStateName): number
-  /** Grip-anchored held-weapon silhouette for a weapon id (procedural, cached).
-   * Drawn pointing +x with the grip near the left edge (WEAPON_ANCHOR), so the
-   * renderer pins it to the hand and rotates it around the grip for the swing.
-   * Every id resolves to a shape (unknown → generic rod), so it's never blank. */
-  weaponTexture(weaponId: string): Texture
+  /** The pack's held-weapon art for a weapon id (views it draws, each an idle
+   * loop + attack one-shot with its grip/muzzle pixels), or undefined when no
+   * pack in the chain draws that weapon: then nothing is held. */
+  heldWeapon(id: string): HeldWeaponArt | undefined
+  /** The wielder's fist in a character frame, measured off the art
+   * (handAnchors.ts), or undefined for frames nobody measured. */
+  fistOf(frame: Texture): FistBox | undefined
+  /** The fist region of `frame` as a texture with the frame's full original
+   * size, so a sprite given the body's own anchor/position/scale draws just
+   * the fist exactly over the body's fist: the cap that closes the hand over a
+   * weapon's grip. Cached per frame. */
+  fistCap(frame: Texture, fist: FistBox): Texture
 }
 
 export type EffectKey = 'hit' | 'explosion' | 'pickup' | 'blood'
+
+/** One drawn view of a held weapon. Frames are unscaled pack art (texture
+ * resolution = the pack's pixel grid); `grip`/`muzzle` are pixels of those
+ * frames (origin top-left), so the renderer can pin the grip under a fist. */
+export interface HeldWeaponView {
+  /** Loop while held (at least one frame). */
+  idle: readonly Texture[]
+  /** One-shot over the attack window: the shot or the swing (may be empty). */
+  attack: readonly Texture[]
+  grip: readonly [number, number]
+  muzzle: readonly [number, number]
+}
+export type HeldWeaponArt = Partial<Record<WeaponView, HeldWeaponView>>
+
+/** A fist in a character frame, in LOGICAL units of that frame (origin top-left;
+ * a hi-res frame's pixel is 0.5): the box the fist covers, and the top-left
+ * corner of the pixel the weapon's grip pixel lands on. */
+export interface FistBox {
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+  gx: number
+  gy: number
+}
 
 export interface DirPose {
   idle?: Texture
@@ -164,6 +196,12 @@ export interface SpriteTextures {
   chars?: Record<string, CharSet>
   /** The drawn body behind each set in `chars`, same keys (theme.charArtKinds). */
   charKinds?: Record<string, string>
+  /** The active pack's artScale (texture density); 1 when absent. */
+  artScale?: number
+  /** Held-weapon art per weapon id (theme `weapon.<id>.<view>-<state>-<n>`). */
+  weapons?: Record<string, HeldWeaponArt>
+  /** Measured fists of the loaded character frames (handAnchors.ts). */
+  fists?: ReadonlyMap<Texture, FistBox>
   /** Per-item pickup sprites, keyed by item id (wrench/knife/medkit/…). */
   items?: Record<string, Texture>
   /** World prop sprites, keyed by archetype (barrel/vending-machine/…). */
@@ -1321,94 +1359,26 @@ export const createArt = (
   }
 
   // ---- Held weapons --------------------------------------------------------
-  // Procedural grip-anchored silhouettes, drawn pointing +x on a fixed canvas so
-  // the renderer rotates them around the grip to swing. One texture per shape,
-  // cached; the mod SKIN (tint/scale/glow) is applied by the renderer on top, so
-  // a modded weapon reuses the same base texture (no per-mod generation).
-  const drawWeapon = (shape: WeaponShape): Texture => {
-    const { w, h, grip } = WEAPON_CANVAS
-    const my = h / 2 // grip / handle centre-line
-    // Transparent full-canvas rect pins generateTexture's bounds so the grip
-    // anchor (grip/w, 0.5) is exact regardless of the drawn silhouette.
-    const g = new Graphics().rect(0, 0, w, h).fill({ color: 0, alpha: 0 })
-    const wood = 0x8a5a2b
-    const steel = 0xb8bcc6
-    const darkSteel = 0x6d7079
-    switch (shape) {
-      case 'hammer': {
-        // Long haft + a big blocky head at the tip — an unmistakable sledge.
-        g.rect(grip, my - 1.5, w - grip - 12, 3).fill(wood)
-        g.roundRect(w - 15, my - 8, 13, 16, 2).fill(steel)
-        g.roundRect(w - 15, my - 8, 13, 16, 2).stroke({ width: 1.5, color: 0x101018, alpha: 0.6 })
-        g.rect(w - 15, my - 8, 4, 16).fill({ color: 0xffffff, alpha: 0.18 }) // struck-face glint
-        break
-      }
-      case 'club': {
-        // Tapered wrench: thin at the grip, fat at the business end.
-        g.poly([grip, my - 2, w - 3, my - 6, w - 3, my + 6, grip, my + 2]).fill(wood)
-        g.poly([grip, my - 2, w - 3, my - 6, w - 3, my + 6, grip, my + 2]).stroke({ width: 1, color: 0x3a2410, alpha: 0.5 })
-        g.circle(grip + 2, my, 2.5).fill(0x5a3a1a) // pommel knob
-        break
-      }
-      case 'blade': {
-        // Short knife: dark grip + guard, then a bright triangular blade.
-        const bx = grip + 9
-        g.rect(grip, my - 2, 9, 4).fill(0x2a2a30) // grip
-        g.rect(bx - 1, my - 4, 2, 8).fill(darkSteel) // guard
-        g.poly([bx, my - 3, w - 6, my, bx, my + 3]).fill(steel) // blade
-        g.poly([bx, my - 3, w - 6, my, bx, my + 3]).stroke({ width: 0.75, color: 0x101018, alpha: 0.5 })
-        break
-      }
-      case 'gun': {
-        // Semi-auto PISTOL, barrel along +x on the aim line (y = my), grip hung
-        // below the rear so the hand (grip anchor) holds the handle and the
-        // muzzle points straight down the aim. Reads grip + guard + slide + barrel.
-        const gx = grip
-        const gunGrip = 0x33363d
-        const frameY = my - 5 // top of the slide/frame
-        // Grip/handle: angled down and slightly back from the frame rear.
-        const handle = [gx - 1, frameY + 4, gx + 6, frameY + 4, gx + 4, my + 9, gx - 3, my + 8]
-        g.poly(handle).fill(gunGrip)
-        g.poly(handle).stroke({ width: 1, color: 0x101018, alpha: 0.55 })
-        // Trigger guard: a ring under the frame just forward of the grip.
-        g.circle(gx + 8, my + 3, 3).stroke({ width: 1.5, color: 0x2a2c33 })
-        // Slide / frame: the boxy top body.
-        g.roundRect(gx - 1, frameY, 22, 7, 1.5).fill(steel)
-        g.roundRect(gx - 1, frameY, 22, 7, 1.5).stroke({ width: 1, color: 0x101018, alpha: 0.5 })
-        // Rear slide serrations + a rear sight nub — grip texture that reads at zoom.
-        g.rect(gx + 1, frameY, 1.5, 7).fill({ color: 0x101018, alpha: 0.32 })
-        g.rect(gx + 4, frameY, 1.5, 7).fill({ color: 0x101018, alpha: 0.32 })
-        g.rect(gx, frameY - 1.5, 3, 1.5).fill(darkSteel) // rear sight
-        // Barrel: a slimmer bar from the slide to the muzzle, centred on the aim line.
-        const barX = gx + 20
-        g.rect(barX, my - 2, w - barX - 3, 4).fill(darkSteel)
-        g.rect(barX + 2, frameY + 1, 2, 1.5).fill(steel) // front sight
-        // Muzzle at the very tip, on the aim line where bullets exit.
-        g.circle(w - 3, my, 2).fill(0x1b1c21)
-        break
-      }
-      case 'rod': {
-        // Generic fallback rod — plain but visible, so no weapon is ever blank.
-        g.rect(grip, my - 2, w - grip - 3, 4).fill(darkSteel)
-        g.rect(grip, my - 2, w - grip - 3, 4).stroke({ width: 1, color: 0x101018, alpha: 0.5 })
-        break
-      }
-    }
-    const tex = renderer.generateTexture(g)
-    g.destroy()
-    return tex
-  }
+  // Pack art only (themeLoader loads `weapon.<id>.<view>-<state>-<n>` unscaled);
+  // there is no procedural weapon. A weapon no pack draws is not held.
+  const heldWeapon = (id: string): HeldWeaponArt | undefined => sprites.weapons?.[id]
 
-  const weaponCache = new Map<string, Texture>()
-  const weaponTexture = (weaponId: string): Texture => {
-    // Key by SHAPE, not id — every gun shares one texture, tinted per mod skin.
-    const shape = weaponShape(weaponId)
-    let tex = weaponCache.get(shape)
-    if (!tex) {
-      tex = drawWeapon(shape)
-      weaponCache.set(shape, tex)
+  const fistOf = (frame: Texture): FistBox | undefined => sprites.fists?.get(frame)
+  const capCache = new WeakMap<Texture, Texture>()
+  const fistCap = (frame: Texture, fist: FistBox): Texture => {
+    let cap = capCache.get(frame)
+    if (!cap) {
+      // Frame/orig/trim are in the texture's logical units, as is the fist.
+      const box = new Rectangle(fist.x0, fist.y0, fist.x1 - fist.x0, fist.y1 - fist.y0)
+      cap = new Texture({
+        source: frame.source,
+        frame: new Rectangle(frame.frame.x + box.x, frame.frame.y + box.y, box.width, box.height),
+        orig: new Rectangle(0, 0, frame.orig.width, frame.orig.height),
+        trim: box,
+      })
+      capCache.set(frame, cap)
     }
-    return tex
+    return cap
   }
 
   const effectFrames = (key: EffectKey): readonly Texture[] => sprites[key] ?? []
@@ -1490,6 +1460,8 @@ export const createArt = (
     bulletGlow,
     themedBullet: () => sprites.projectile,
     animTpf: (state) => animTpfs[state] ?? DEFAULT_TPF[state],
-    weaponTexture,
+    heldWeapon,
+    fistOf,
+    fistCap,
   }
 }

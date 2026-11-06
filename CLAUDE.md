@@ -139,6 +139,14 @@ prefix is the sort key, so a stale-dated note lands below newer ones and may
 never reach the menu at all. Skip it only for pure internals with nothing a
 player would notice.
 
+## Art direction and the owner's PC
+
+Anything the player sees follows `docs/art-direction.md` (generated art only, hand
+pixels only as ControlNet/IPAdapter structure; thematic animated weapons, none on
+beasts; the Flashback feel; display physics never on the wire). Long GPU runs on the
+owner's machine follow `docs/owner-pc-ops.md` (hard crashes, GPU lock, mindmeld
+stand-down, crash auto-resume, the draw-board dashboard in `scripts/dashboard/`).
+
 ## Decide by drawing scenario comics first
 
 Owner's rule. Before deciding what to build, or how, walk through several concrete

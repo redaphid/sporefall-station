@@ -142,7 +142,7 @@ def draw(B, period, yaw=14.0):
 
 # ---- scratch (quadruped) ----------------------------------------------------------------------------
 
-def scratch(B, period, sit_forward=0.16):
+def scratch(B, period, sit_forward=0.16, sit_down=0.16, head_back=0.16):
     F = B.fit
     H = B.height
     legs = ("fore_near", "fore_far", "hind_near", "hind_far")
@@ -158,14 +158,14 @@ def scratch(B, period, sit_forward=0.16):
         if kind == "rest":
             return J
         # sit back: the rump drops and slides forward, the hips with it; the front stays planted
-        sit = B.proj(f=sit_forward * H, u=-0.16 * H)
+        sit = B.proj(f=sit_forward * H, u=-sit_down * H)
         for k in ("rump", "hind_near_top", "hind_far_top"):
             J[k] = F[k] + sit
         J["withers"] = F["withers"] + B.proj(u=-0.03 * H)
         for L in ("fore_near_top", "fore_far_top"):
             J[L] = F[L] + B.proj(u=-0.03 * H)
         # the head turns back and down toward the near side, to meet the foot
-        turn = B.proj(f=-0.16 * H, s=0.10 * H, u=-0.03 * H)
+        turn = B.proj(f=-head_back * H, s=0.10 * H, u=-0.03 * H)
         J["head_top"] = F["head_top"] + turn
         J["neck"] = F["neck"] + 0.7 * turn
         for L in ("fore_near", "fore_far", "hind_far"):
@@ -218,10 +218,13 @@ def main():
                                                "that looks along the facing (s, n) reads an aim better turned ~30")
     ap.add_argument("--sit-forward", type=float, help="scratch: how far the rump slides forward as it sits, in body "
                                                        "heights (default .16); less keeps the centroid (gate 3 cx) still")
+    ap.add_argument("--sit-down", type=float, help="scratch: how far the rump drops (default .16 body heights)")
+    ap.add_argument("--head-back", type=float, help="scratch: how far the head turns back to meet the foot (default .16)")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     B = Body(json.load(open(a.fit)))
-    kw = {k: v for k, v in (("yaw", a.yaw), ("sit_forward", a.sit_forward)) if v is not None}
+    kw = {k: v for k, v in (("yaw", a.yaw), ("sit_forward", a.sit_forward), ("sit_down", a.sit_down),
+                                              ("head_back", a.head_back)) if v is not None}
     frames, keys = build(B, a.action, a.period, **kw)
     for i, f in enumerate(frames):
         json.dump(f, open(os.path.join(a.out, f"joints-{i:02d}.json"), "w"))

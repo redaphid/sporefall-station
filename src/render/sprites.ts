@@ -33,7 +33,7 @@ import {
   type DeathFacts,
   type IsSolid,
 } from './displayBody'
-import { burstBlocks, dustBlocks, reachToWall, squashMatrix, type Block } from './slamFx'
+import { burstBlocks, dustBlocks, FAN, reachToWall, squashMatrix, type Block } from './slamFx'
 import {
   ARCHETYPE_SCALE,
   CHAR_PX,
@@ -719,35 +719,53 @@ export class EntityViews {
     view.weaponShapeKey = undefined
   }
 
-  /** The slam over a thrown ghost already posed by its track: the squash
-   * (pressed to the face: the wall-side edge stays put while the far side
-   * comes in), then the impact burst and the dust puff on `g.fx`. */
+  /** The slam over a thrown ghost already posed by its track. It keeps the
+   * body out of the wall it hit: a body lying on its side is longer than its
+   * footprint, so against a side wall or the back of a south wall it is held
+   * off the face by its own reach. Then the squash: in profile (a side wall)
+   * the wall-side edge stays on the face while the far side comes in; face-on
+   * or from behind it splats about its middle. Then the impact burst and the
+   * dust puff on `g.fx`. */
   private slamGhost(g: Ghost, body: BodyTrack, ticks: number, rot: number): void {
     const sl = body.slam!
     const { width: w, height: h } = g.sprite.texture
-    g.sprite.skew.set(0, 0)
+    const s = g.sprite
+    s.skew.set(0, 0)
+    let x = s.position.x
+    let y = s.position.y
+    if (sl.faceX !== undefined) {
+      const lim = sl.faceX * TILE_PX + Math.sign(sl.nx) * reachToWall(rot, w, h, 1, 0)
+      if (Math.sign(sl.nx) * (x - lim) < 0) x = lim
+    }
+    if (sl.faceY !== undefined && sl.ny < 0) y = Math.min(y, sl.faceY * TILE_PX - reachToWall(rot, w, h, 0, 1))
     const sq = slamAt(body, ticks)
     if (sq && sq.q !== 0) {
       const m = squashMatrix(rot, g.flip, sq.q, sq.nx, sq.ny)
-      const press = sq.q * reachToWall(rot, w, h, sq.nx, sq.ny)
-      const x = g.sprite.position.x - sq.nx * press
-      const y = g.sprite.position.y - sq.ny * press
-      g.sprite.setFromMatrix(new Matrix(m.a, m.b, m.c, m.d, x, y))
-    }
+      const press = sl.faceX !== undefined ? sq.q * reachToWall(rot, w, h, sq.nx, sq.ny) : 0
+      s.setFromMatrix(new Matrix(m.a, m.b, m.c, m.d, x - sq.nx * press, y - sq.ny * press))
+    } else s.position.set(x, y)
+
     const blocks: Block[] = []
     const since = ticks - sl.tick
     if (since >= 0 && since < SLAM.burstTicks) {
-      // On the face where the body met it: its centre at the hit, out to its edge.
-      const cx = sl.x * TILE_PX - sl.nx * reachToWall(sl.rot, w, h, sl.nx, sl.ny)
-      const cy = charFootPx(sl.y, TILE_PX) - restLift(sl.rot, h) - sl.z * TILE_PX - sl.ny * reachToWall(sl.rot, w, h, sl.nx, sl.ny)
-      blocks.push(...burstBlocks(since, body.throw.seed, cx, cy, sl.nx, sl.ny))
+      // In profile, on the face at the body's middle; face-on or from
+      // behind, a ring over the middle of the splat.
+      const midY = charFootPx(sl.y, TILE_PX) - restLift(sl.rot, h) - sl.z * TILE_PX
+      const profile = sl.faceX !== undefined
+      const cx = profile ? sl.faceX! * TILE_PX : sl.x * TILE_PX
+      blocks.push(...burstBlocks(since, body.throw.seed, cx, midY, sl.nx, sl.ny, profile ? FAN.profile : FAN.ring))
     }
-    if (sl.z > 0) blocks.push(...dustBlocks(ticks - sl.down, body.throw.seed, sl.x * TILE_PX, charFootPx(sl.y, TILE_PX)))
+    if (sl.z > 0) {
+      // Under the body as drawn: the back of a south wall holds it off its
+      // feet line.
+      const floor = Math.min(charFootPx(sl.y, TILE_PX), sl.faceY !== undefined && sl.ny < 0 ? sl.faceY * TILE_PX : Infinity)
+      blocks.push(...dustBlocks(ticks - sl.down, body.throw.seed, x, floor))
+    }
     const fx = g.fx!
     fx.clear()
     for (const b of blocks) fx.rect(b.x, b.y, b.w, b.h).fill({ color: b.color, alpha: b.alpha })
     fx.visible = blocks.length > 0
-    fx.zIndex = g.sprite.zIndex + 0.01
+    fx.zIndex = s.zIndex + 0.01
   }
 
   /** Advance death ghosts: play the death clip (theme frames or the held last

@@ -50,15 +50,18 @@ export const squashMatrix = (rot: number, flip: boolean, q: number, nx: number, 
 }
 
 /** How far the body reaches from its centre toward the wall at normal
- * (nx, ny), spun by rot, texture w x h px (screen px). */
+ * (nx, ny), spun by rot, texture w x h px (screen px). The body is an ellipse
+ * inside the canvas, not the canvas: a box's corner would hold a half-tipped
+ * body a hand's width off the face. */
 export const reachToWall = (rot: number, w: number, h: number, nx: number, ny: number): number => {
   const hw = (w * BODY_FILL.w) / 2
   const hh = (h * BODY_FILL.h) / 2
-  const cs = Math.abs(Math.cos(rot))
-  const sn = Math.abs(Math.sin(rot))
-  const ex = cs * hw + sn * hh
-  const ey = sn * hw + cs * hh
-  return Math.abs(nx) * ex + Math.abs(ny) * ey
+  const cs = Math.cos(rot)
+  const sn = Math.sin(rot)
+  // Support of the spun ellipse along the unit direction (nx, ny).
+  const u = nx * cs + ny * sn
+  const v = -nx * sn + ny * cs
+  return Math.hypot(hw * u, hh * v) / Math.max(1e-9, Math.hypot(nx, ny))
 }
 
 /** One block of an effect: world px, top-left, whole pixels. */
@@ -75,7 +78,8 @@ const WHITE = 0xfffbe8
 const YELLOW = 0xffd23f
 const ORANGE = 0xe8701a
 const GRIT = 0x8a8478
-const DUST = 0xb9b1a0
+const DUST = 0x8f8068
+const DUST_LIT = 0xb3a283
 
 /** A deterministic 0..1 from a seed and a salt (the same murmur finaliser as
  * displayBody's). */
@@ -86,14 +90,20 @@ const unit = (seed: number, salt: number): number => {
   return (h >>> 0) / 0x100000000
 }
 
-/** The rays of the burst: unit directions fanned off the wall face (into the
- * room, the half the normal points to), jittered per body. */
-const rays = (seed: number, nx: number, ny: number): { x: number; y: number; len: number }[] => {
+/** Half-angle of the burst's fan about the normal. Off a side wall (seen in
+ * profile) the rays stay out of the wall; behind a body slammed into a north
+ * or south wall they ring it, and the body hides the middle. */
+export const FAN = { profile: Math.PI * 0.36, ring: Math.PI } as const
+
+/** The rays of the burst: unit directions fanned `fan` either side of the
+ * normal, jittered per body. */
+const rays = (seed: number, nx: number, ny: number, fan: number): { x: number; y: number; len: number }[] => {
   const base = Math.atan2(ny, nx)
   const out: { x: number; y: number; len: number }[] = []
-  const n = 7
+  const n = fan >= Math.PI ? 8 : 7
   for (let i = 0; i < n; i++) {
-    const a = base + ((i / (n - 1)) * 2 - 1) * (Math.PI * 0.55) + (unit(seed, 10 + i) - 0.5) * 0.25
+    const spread = fan >= Math.PI ? (i / n) * 2 - 1 : (i / (n - 1)) * 2 - 1
+    const a = base + spread * fan + (unit(seed, 10 + i) - 0.5) * 0.25
     out.push({ x: Math.cos(a), y: Math.sin(a), len: i % 2 === 0 ? 1 : 0.6 + 0.3 * unit(seed, 20 + i) })
   }
   return out
@@ -103,7 +113,7 @@ const rays = (seed: number, nx: number, ny: number): { x: number; y: number; len
  * the wall's normal (nx, ny). Empty outside 0 .. SLAM.burstTicks. Frame 0: a
  * white flash and short spikes; 1-2: long yellow-orange spikes; then the
  * spikes break into flying chips of grit and fade. */
-export const burstBlocks = (s: number, seed: number, cx: number, cy: number, nx: number, ny: number): Block[] => {
+export const burstBlocks = (s: number, seed: number, cx: number, cy: number, nx: number, ny: number, fan: number = FAN.profile): Block[] => {
   if (!(s >= 0) || s >= SLAM.burstTicks) return []
   const f = Math.floor(s)
   const X = Math.round(cx)
@@ -113,22 +123,22 @@ export const burstBlocks = (s: number, seed: number, cx: number, cy: number, nx:
     out.push({ x: Math.round(x - size / 2), y: Math.round(y - size / 2), w: size, h: size, color, alpha })
   }
   if (f === 0) {
-    px(X, Y, WHITE, 1, 4)
-    for (const r of rays(seed, nx, ny)) for (let k = 2; k <= 2 + 3 * r.len; k++) px(X + r.x * k, Y + r.y * k, k < 4 ? WHITE : YELLOW)
+    px(X, Y, WHITE, 1, 5)
+    for (const r of rays(seed, nx, ny, fan)) for (let k = 3; k <= 3 + 4 * r.len; k++) px(X + r.x * k, Y + r.y * k, k < 5 ? WHITE : YELLOW, 1, k < 5 ? 2 : 1)
     return out
   }
   if (f <= 2) {
     px(X, Y, f === 1 ? YELLOW : ORANGE, 1, f === 1 ? 3 : 2)
-    for (const r of rays(seed, nx, ny)) {
-      const from = 2 + f * 2
-      const to = from + 4 * r.len + 1
+    for (const r of rays(seed, nx, ny, fan)) {
+      const from = 3 + f * 2
+      const to = from + 5 * r.len
       for (let k = from; k <= to; k++) px(X + r.x * k, Y + r.y * k, k < from + 2 ? YELLOW : ORANGE)
     }
   }
   // Chips of grit thrown off the face, from frame 1, falling a little.
   const fade = 1 - (f - 1) / (SLAM.burstTicks - 1)
   for (let i = 0; i < 5; i++) {
-    const a = Math.atan2(ny, nx) + (unit(seed, 30 + i) - 0.5) * 2.2
+    const a = Math.atan2(ny, nx) + (unit(seed, 30 + i) - 0.5) * 2 * Math.min(fan, 1.1)
     const sp = 3 + 2.5 * unit(seed, 40 + i)
     const d = sp * f
     px(X + Math.cos(a) * d, Y + Math.sin(a) * d + 0.5 * f * f, i % 2 === 0 ? GRIT : ORANGE, fade, i < 2 ? 2 : 1)
@@ -137,8 +147,9 @@ export const burstBlocks = (s: number, seed: number, cx: number, cy: number, nx:
 }
 
 /** The dust puff where the body comes to rest at the wall's foot, `s` ticks
- * after it reaches the floor, at world px (cx, cy) on the floor line. Empty
- * outside 0 .. SLAM.dustTicks. Small clumps roll out to both sides and rise. */
+ * after it reaches the floor, at world px (cx, cy) on the floor line under it.
+ * Empty outside 0 .. SLAM.dustTicks. Clumps of grime roll out to both sides
+ * from under the body and rise, each a dark block with a lit top. */
 export const dustBlocks = (s: number, seed: number, cx: number, cy: number): Block[] => {
   if (!(s >= 0) || s >= SLAM.dustTicks) return []
   const f = Math.floor(s)
@@ -146,11 +157,13 @@ export const dustBlocks = (s: number, seed: number, cx: number, cy: number): Blo
   const out: Block[] = []
   for (let i = 0; i < 6; i++) {
     const side = i % 2 === 0 ? -1 : 1
-    const reach = (5 + 6 * unit(seed, 50 + i)) * Math.sqrt(u + 0.12)
-    const size = i < 2 ? 3 : 2
+    const reach = (8 + 7 * unit(seed, 50 + i)) * Math.sqrt(u + 0.1)
+    const size = i < 2 ? 4 : 3
     const x = Math.round(cx + side * reach - size / 2)
-    const y = Math.round(cy - 1 - (2 + 3 * unit(seed, 60 + i)) * u - size / 2)
-    out.push({ x, y, w: size, h: size, color: DUST, alpha: 0.75 * (1 - u) })
+    const y = Math.round(cy - size - (1 + 3 * unit(seed, 60 + i)) * u)
+    const alpha = 0.85 * (1 - u * u)
+    out.push({ x, y, w: size, h: size, color: DUST, alpha })
+    out.push({ x, y, w: size, h: 1, color: DUST_LIT, alpha })
   }
   return out
 }

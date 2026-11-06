@@ -304,8 +304,8 @@ export const SLAM = {
   hold: 3,
   /** CRUMPLE: ticks the squash springs back (past round, then settling). */
   spring: 6,
-  /** CRUMPLE: ticks to tip the rest of the way onto its side. */
-  crumple: 4,
+  /** CRUMPLE: ticks from the impact to tip the rest of the way onto its side. */
+  crumple: 6,
   /** SLUMP: ticks to slide down the face to the floor. */
   slump: 8,
   /** A second wall this many ticks away across the first one's normal is
@@ -333,6 +333,10 @@ export interface Slam {
   rot: number
   /** Tick since the death it reaches the floor (the dust puff). */
   down: number
+  /** The wall planes it is pressed to, in tiles: the x of a side wall's face
+   * (nx set), the y of a north or south wall's edge (ny set). */
+  faceX?: number
+  faceY?: number
 }
 
 /** The body at one moment. `z` is height off the floor in tiles; `rot` is the
@@ -520,14 +524,27 @@ export const simulateBody = (th: Throw, solid: IsSolid, onWall: OnWall = stopAtW
       poses.push({ x, y, z: z0 * (1 - u * u), rot: 0 })
     }
     const amp = lerp(SLAM.squash.min, SLAM.squash.max, clamp01((hit.speed - SLAM.minSpeed) / (SLAM.maxSpeed - SLAM.minSpeed)))
-    slam = { tick: k0, x, y, z: z0, nx: hit.nx / len, ny: hit.ny / len, speed: hit.speed, amp, rot: 0, down }
+    slam = {
+      tick: k0,
+      x,
+      y,
+      z: z0,
+      nx: hit.nx / len,
+      ny: hit.ny / len,
+      speed: hit.speed,
+      amp,
+      rot: 0,
+      down,
+      ...(hit.nx !== 0 ? { faceX: Math.round(x - Math.sign(hit.nx) * rx) } : {}),
+      ...(hit.ny !== 0 ? { faceY: Math.round(y - Math.sign(hit.ny) * ry) } : {}),
+    }
     if (!grounded) landed = down
   }
 
   // The tip is steady through the hop and the bounces and lays the body on its
   // side at the last landing; then it rocks past its side and back (the roll)
   // and slides lying still. It never comes back toward upright. A slam holds
-  // the tip while the body is pressed flat, then finishes it as it crumples.
+  // the tip at the impact and finishes it as the body crumples.
   const land = landed > 0 ? landed : poses.length - 1
   const tipAt = (i: number): number => {
     if (i <= land) return (finalRot * i) / land
@@ -540,9 +557,10 @@ export const simulateBody = (th: Throw, solid: IsSolid, onWall: OnWall = stopAtW
       const s = i - slam.tick
       const rot0 = poses[slam.tick].rot
       if (i > land) poses[i].rot = tipAt(i)
-      else if (s <= SLAM.hold) poses[i].rot = rot0
       else {
-        const u = Math.min(1, (s - SLAM.hold) / SLAM.crumple)
+        // It tips while it is pressed flat, so the spring back never shows
+        // it more upright than the splat did.
+        const u = Math.min(1, s / SLAM.crumple)
         poses[i].rot = rot0 + (finalRot - rot0) * (1 - (1 - u) * (1 - u))
       }
     }

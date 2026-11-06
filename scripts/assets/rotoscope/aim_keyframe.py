@@ -100,6 +100,17 @@ def _sample(kf, xy, r=6):
     return px[len(px) // 2]
 
 
+def framing(kf, out):
+    """(top, bottom, height ratio) of the figure in `out` against `kf`: the edit may not reframe the
+    character (Qwen zooms in on a front view). Non-white extents on the 1280x720 frame."""
+    def ext(im):
+        a = np.asarray(im.convert("RGB")).astype(int)
+        rows = np.nonzero((np.abs(a - 255).sum(-1) > 60).sum(1) > 2)[0]
+        return int(rows.min()), int(rows.max())
+    (t0, b0), (t1, b1) = ext(kf), ext(out)
+    return t1 - t0, b1 - b0, round((b1 - t1) / max(1, b0 - t0), 3)
+
+
 def cmd_paint(a):
     os.makedirs(a.out, exist_ok=True)
     kf = Image.open(a.kf).convert("RGB")
@@ -162,15 +173,23 @@ def cmd_paint(a):
     arm_paint("arm-near")  # the gun hand's fist over the grip
     paint.save(f"{a.out}/{a.dir}-paint.png")
     who = open(a.describe_file).read().strip()
+    hidden = a.dir == "n"  # from behind, the body hides a gun held out in front of the chest
+    if hidden:
+        weapon = "hidden from view in front of the body; nothing of it shows past the head and shoulders"
+    else:
+        weapon = (f"{'the one in image 2, ' if a.design else ''}small in the hands: about as long as the character's "
+                  f"forearm, a quarter of its height ({a.weapon or WEAPON})")
     prompt = (f"Edit image 1, a pixel-art video game character, so it matches the rough paint-over: {who}, "
               f"{VIEWS[a.dir]}, holding a weapon in a firm two-handed grip with both arms raised and held out "
-              f"straight at chest height, exactly where the rough painted arms and grey block are. The weapon is "
-              f"{'the one in image 2: ' if a.design else ''}{a.weapon or WEAPON}. {'' if a.weapon else NOT} The arms no longer hang at the sides. Keep everything else "
-              f"exactly the same: the same character, face, hair, clothes, colours, proportions, size and position, "
-              f"the same thick dark outline and crisp pixel-art style, on the same plain white background.")
+              f"straight at chest height, exactly where the rough painted arms{'' if hidden else ' and grey block'} are. "
+              f"The weapon is {weapon}. {'' if a.weapon or hidden else NOT} The arms no longer hang at the sides. "
+              f"Show the whole character from the top of the head down to the boots at exactly the same size and "
+              f"position as in image 1: do not zoom in, do not crop, do not move the camera. Keep everything else "
+              f"exactly the same: the same character, face, hair, clothes, colours, proportions, the same thick dark "
+              f"outline and crisp pixel-art style, on the same plain white background.")
     if a.paint_only:
         return
-    design = [Image.open(a.design).convert("RGB")] if a.design else []
+    design = [Image.open(a.design).convert("RGB")] if a.design and not hidden else []
     sq = paint.crop(CROP).resize((Q, Q), Image.LANCZOS)
     json.dump({"prompt": prompt, "frame": a.frame, "rig": a.rig, "design": a.design}, open(f"{a.out}/{a.dir}-paint.json", "w"), indent=1)
     for seed in a.seeds:
@@ -180,7 +199,7 @@ def cmd_paint(a):
         back.save(f"{a.out}/{a.dir}-aim-s{seed}.png")
         back.resize((848, 480), Image.LANCZOS).save(f"{a.out}/{a.dir}-aim-s{seed}-848.png")
         json.dump(g.nodes, open(f"{a.out}/{a.dir}-aim-s{seed}_api.json", "w"), indent=1)
-        print(a.dir, seed, flush=True)
+        print(a.dir, seed, "frame", framing(kf, back), flush=True)
 
 
 def main():

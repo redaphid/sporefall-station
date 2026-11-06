@@ -267,6 +267,16 @@ CHARS = {
     # which never drifts — is that the stalker states its silhouette as explicit
     # geometry ("twice as wide as it is tall", "no upright torso") instead of
     # naming a body plan and hoping. Same treatment here.
+    # The Mireclaw Alpha (boss). Its art came from the August hires run, not this table, so it had no
+    # jobs here; verify.py (gates 4a, 4b, 6) found none and passed it after checking 0 frames. The entry
+    # gives the gate its jobs; manifest.py names char.boss.* explicitly either way.
+    "boss": ("mireclaw-alpha",
+             "a huge menacing armoured swamp crab, wider than it is tall, a wide spiky shell of black "
+             "chitin with a glossy glowing violet dome plate across its top and a jagged spiny rim, a "
+             "fanged dark maw under the front rim of the shell, spiny segmented black-and-violet limbs "
+             "raised high around the shell, one a curved hooked pincer, thick armoured walking legs "
+             "with bulging violet plates ending in splayed hooked black claws",
+             "human, biped, upright torso, clothing, weapon, teal suit, orange cap"),
     "brute": ("carapace-brute",
               "a massive armored beast walking on ALL FOURS, a long heavy body carried "
               "horizontally on four thick pillar legs, no upright torso, the broad domed "

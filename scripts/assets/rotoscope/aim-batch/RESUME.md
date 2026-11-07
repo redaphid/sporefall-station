@@ -13,7 +13,7 @@ Batch scripts: `aim-batch/` (copies of /mnt/d/tmp/cast-walks/aim/*.sh). Run GPU 
 ## State per character / facing
 | | s | se | e | ne | n |
 |---|---|---|---|---|---|
-| player kf (Qwen) | s3/s11/s23 good | s23 picked (gun points right, ok) | good | s23 picked | BAD: hands up (prompt fixed 0a.., not rerun) |
+| player kf (Qwen) | s3/s11/s23 good | s23 picked (gun points right, ok) | good | s23 picked | BAD: hands up (prompt fixed c8bb06fb, not rerun) |
 | player FC | aim + aimwalk t1 s3 | aim + aimwalk t1 s3 | aim + aimwalk t1 s3 | not rendered (killed) | not rendered |
 | player post | aim (40,40 +breathe), aimwalk 27..48 step 3 (seam .008) -> `player/stage` | - | - | - | - |
 | drowner kf | s11 picked, good | s3 picked | s3 good | s11 ok | idle-like (rerun with new prompt) |

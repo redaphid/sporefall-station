@@ -1,1 +1,1 @@
-export default 'Bodies thrown into walls slam, crumple and slump'
+export default 'Thrown bodies slam into walls and slump'

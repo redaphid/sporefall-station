@@ -32,6 +32,9 @@ export const SW_GLOB_PATTERNS: readonly string[] = [
   'manifest.webmanifest',
   'assets/**/*.{js,css}',
   'icons/**/*.{png,svg,ico}',
+  // The Test scenarios cards' pictures (src/playable): small, and the list
+  // must look right offline too.
+  'playable/*.webp',
   'themes/index.json',
   'themes/swampspace-hires/**/*.{json,png,webp}',
   'themes/swampspace/**/*.{json,png,webp}',

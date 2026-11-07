@@ -49,6 +49,9 @@ What "AI-native" means here, concretely:
   emergent-mechanic tests), narrate them with annotations, and record annotated
   video/stills — see the **`.claude/skills/gameplay-experiments`** skill and
   `docs/gameplay-experiments.md`.
+- **Make it playable.** The start menu's Test scenarios list (`src/playable`) boots
+  any registered world at `?play=<id>`; every new mechanic test that sets up a world
+  registers it there. Recipe: the **`.claude/skills/test-scenarios`** skill.
 - **Reflect on entity types.** Components are ad-hoc optional fields on `Entity`; a
   reflection/schema verb enumerates what's present so an agent can reason about
   unfamiliar entities rather than relying on a hardcoded list.

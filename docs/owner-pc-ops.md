@@ -52,11 +52,10 @@ Read before an unattended ComfyUI/Wan run. Art-run procedure lives in
 
 - ComfyUI `http://127.0.0.1:8188` (never 8189, another project's). Start:
   `cd /mnt/d/tools/comfy && powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'D:\tools\comfy\scripts\start.ps1' -Only default -Background`.
-- **Forbidden: the private Ollama on `127.0.0.1:18436`** (Aaron, 2026-11-06: "you are
-  forbidden from using the private one ... You must use the default or maybe a new one").
-  Use the default Ollama behind the ollama-proxy (11434-11436, backend 11433; it 503s
-  while non-Ollama GPU use > 20%, check `curl 127.0.0.1:11434/_gate`) or a new dedicated
-  instance. The cast-walk VLM gate still points at 18436 and must be migrated (issue).
+- Private Ollama for the VLM gate and local-LLM tooling on `127.0.0.1:18436` (allowed;
+  models in `D:\tmp\cast-walks\ollama-models`; start command in `docs/cast-walks/RUNBOOK.md`
+  Environment). **Forbidden: ComfyUI on port 8189** (another project's instance; Aaron,
+  2026-11-06: "Just not the 8189 comfyui"). Use ComfyUI on 8188 only.
 - `/usr/bin/node` is broken here: `export PATH=~/.local/node22/bin:$PATH`, then
   `corepack pnpm ...`.
 - Images for Aaron's phone: `~/.local/bin/2cb <files>` prints `https://2cb.pw/<code>`

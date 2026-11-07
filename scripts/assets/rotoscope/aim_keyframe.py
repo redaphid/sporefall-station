@@ -184,8 +184,9 @@ def cmd_paint(a):
         weapon = (f"{'the one in image 2, ' if a.design else ''}small in the hands: about as long as the character's "
                   f"forearm, a quarter of its height ({a.weapon or WEAPON})")
     prompt = (f"Edit image 1, a pixel-art video game character, so it matches the rough paint-over: {who}, "
-              f"{VIEWS[a.dir]}, holding a weapon in a firm two-handed grip with both arms raised and held out "
-              f"straight at chest height, exactly where the rough painted arms{'' if hidden else ' and grey block'} are. "
+              f"{VIEWS[a.dir]}, holding a weapon in a firm two-handed grip with both arms "
+              f"{'reaching forward in front of the chest, away from the viewer, so the hands are hidden by the body; from behind only the shoulders and the bent elbows show, tucked close to the sides. The arms are NOT raised above the head and the hands do not show' if hidden else 'raised and held out straight at chest height'}"
+              f", exactly where the rough painted arms{'' if hidden else ' and grey block'} are. "
               f"The weapon is {weapon}. {'' if a.weapon or hidden else NOT} The arms no longer hang at the sides. "
               f"Show the whole character from the top of the head down to the boots at exactly the same size and "
               f"position as in image 1: do not zoom in, do not crop, do not move the camera. Keep everything else "

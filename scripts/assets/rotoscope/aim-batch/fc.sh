@@ -6,6 +6,7 @@ A=/mnt/d/tmp/cast-walks/aim; W=~/Worktrees/sporefall-station/aim-art-1106
 cd $W/scripts/assets/rotoscope
 for spec in "$@"; do
   set -- $spec; c=$1; d=$2; ks=$3; seed=$4; tag=$5
+  [ -e $A/skip-$c-$d ] && { echo "skip $c $d"; continue; }
   desc=$A/$c/describe.txt; case $d in ne|n) desc=$A/$c/describe-back.txt;; esac
   ref=$A/$c/kf/$d-aim-s$ks-848.png
   for st in aim aimwalk; do

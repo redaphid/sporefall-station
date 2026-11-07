@@ -164,3 +164,38 @@ reach: 4 ticks (0.13 s) against 10 ticks (0.33 s) for the R&D cut at the uniform
 `/mnt/d/tmp/cast-walks/mocap/library/draw/<view>/`: the actor stills, the Wan clips (`clip-sN/`), the
 DWPose keypoints (`clip-sN-kps.json`) and drawn poses, and `urgency.json` (mocap_pick's ranking). Any
 humanoid retargets them with its own `fit-<view>.json` and no GPU for the reference.
+
+## Resume note (wind-down, 2026-11-06 17:15)
+
+**Done, on `feat/player-draw-1106` and deployed at `https://sporefall.hypnodroid.com/betas/player-draw/`
+(e frames byte-identical to the branch; the e2e scenario passes against the beta):**
+- Engine: the player draw trigger, `MAX_ANIM_FRAMES` 16, `animTiming`, the weapon-variant seam. Full
+  vitest 5803/5804 (the one failure, `rtcTransport` "retry that dies half open", is a timing flake that
+  passes 3/3 alone; no net code changed). Build and lint green.
+- Art, `e` only: 14-frame quickdraw with the Rivet Driver, ending in the braced aim, `animTiming` 21
+  ticks, plus a provisional `e-aim-0` (the clip's last frame) until `art/aim-1106` ships the aim loop.
+  West mirrors e.
+
+**Open defects / status:**
+- Face: fixed at the root for e (`post --own-colours`), gated (`action_checks.py face`, 0 fails).
+- Urgency/timing: `--plan quick` gives a 4-tick holster-to-aim snap (R&D: 10 ticks). Not yet judged by
+  the owner.
+- Colour snap: works when the rest frame carries the drift (e seed 3, the R&D take); seed 11 drifts
+  after its rest frame and is not fixed (see Lessons).
+- Facings: only `e` (and mirrored `w`) draw. s, se, ne, n have references, keypoints and retargeted
+  skeletons but no Fun-Control render yet, so the player shows no draw facing those ways (drawn-only).
+- Hand-off: the draw ends in `rig_action aim`'s pose, the same skeleton `art/aim-1106` renders from. When
+  its `e-aim-*` frames land, drop the provisional `e-aim-0` and check the cut at 4x.
+
+**Next command** (s/se/ne/n Fun-Control, then post; the scripts are ready, nothing to prepare):
+```
+cd /mnt/d/tmp/cast-walks/mocap/ship
+~/Projects/sporefall-station/scripts/gpu/gpu-run --keep-models --label "vine-ranger s/se quickdraw FC" -- $PWD/fc-front.sh
+~/Projects/sporefall-station/scripts/gpu/gpu-run --label "vine-ranger ne/n quickdraw FC" -- $PWD/fc-back.sh
+for v in s se; do for t in fc/$v-s3-*; do ./post-take.sh $v rig/draw-$v-s3 $PWD/$t; done; done
+for v in ne n; do for t in fc/$v-s11-*; do ./post-take.sh $v rig/draw-$v-s11 $PWD/$t; done; done
+```
+Then pick per view by zoom (`rotoscope/draw_sheet.py`), `cast_action.py export <post dir> --kind
+vine-ranger --state draw --arch player` per picked take, and re-run `src/render/charConsistency.test.ts`.
+Back-view refs: the Qwen aim keyframes for se/ne/n drew the Rivet Driver far too big; prefer the idle
+keyframe or the aim worker's keyframes for those views.

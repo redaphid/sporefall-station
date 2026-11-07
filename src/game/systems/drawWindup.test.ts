@@ -17,7 +17,7 @@ import type { World } from '../world'
 import { applyDamage } from './combat'
 
 const WINDUP = 16
-const PISTOLS = ['drowner', 'bellwether', 'acolyte'] as const
+const RIVET_CARRIERS = ['drowner', 'bellwether', 'acolyte'] as const
 
 interface Tick {
   /** The sim tick this row's systems ran at. */
@@ -78,12 +78,12 @@ describe('engage wind-up — the data', () => {
       const ranged = WEAPONS[def.weapon]?.kind === 'ranged'
       expect(def.drawTicks, `${def.archetype} (${def.weapon})`).toBe(ranged ? WINDUP : undefined)
     }
-    expect(PISTOLS.every((a) => NPCS[a].weapon === 'pistol')).toBe(true)
+    expect(RIVET_CARRIERS.every((a) => NPCS[a].weapon === 'rivetDriver')).toBe(true)
   })
 })
 
 describe('engage wind-up — a pistol carrier spotting a player in range', () => {
-  for (const archetype of PISTOLS) {
+  for (const archetype of RIVET_CARRIERS) {
     it(`${archetype}: holds fire for exactly ${WINDUP} ticks after it engages, then fires`, () => {
       const { w, npc, step } = scene(archetype, 6)
       const rows = watch(w, npc, 120, step)

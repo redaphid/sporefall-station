@@ -68,7 +68,7 @@ const mutant = (s: Scene['w'], x: number, y: number, hp: number, max = 90): Enti
 const pistolScene = (mx = 9.5, max = 24): Scene => {
   const world = worldFromRows(walledRoom(20, 10), { seed: 5 })
   const p = tank(world, mx - 5, 5.5)
-  arm(p, 'pistol')
+  arm(p, 'rivetDriver')
   const m = mutant(world, mx, 5.5, 14, max)
   return { w: world, focus: [m], before: () => {}, n: 140, inputs: new Map([[0, { attack: true, aimX: 1, aimY: 0 }]]) }
 }
@@ -77,7 +77,7 @@ const pistolScene = (mx = 9.5, max = 24): Scene => {
 const wrenchScene = (): Scene => {
   const world = worldFromRows(walledRoom(20, 10), { seed: 5 })
   const p = tank(world, 6.5, 5.5)
-  arm(p, 'wrench')
+  arm(p, 'pressureLance')
   const m = mutant(world, 7.6, 5.5, 30, 30)
   return { w: world, focus: [m], before: () => {}, n: 140, inputs: new Map([[0, { attack: true, aimX: 1, aimY: 0 }]]) }
 }

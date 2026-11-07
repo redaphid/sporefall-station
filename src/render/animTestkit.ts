@@ -199,7 +199,7 @@ export const tank = (w: World, x: number, y: number): Entity => {
 export const brawlScene = (): Scene => {
   const w = worldFromRows(walledRoom(20, 10), { seed: 5 })
   const p = tank(w, 5.5, 5.5)
-  arm(p, 'pistol')
+  arm(p, 'rivetDriver')
   const h = spawnNpc(w, 'mutant', 9.5, 5.5)
   h.health!.max = 90
   h.health!.hp = 90
@@ -220,7 +220,7 @@ export const brawlScene = (): Scene => {
 export const aimScene = (): Scene => {
   const w = worldFromRows(walledRoom(30, 14), { seed: 9 })
   const p = tank(w, 12.5, 9.5)
-  arm(p, 'pistol')
+  arm(p, 'rivetDriver')
   const d = spawnNpc(w, 'drowner', 27.5, 1.5)
   const input = (i: number): Partial<InputCmd> => {
     const aim = { aimX: 1, aimY: 0 }
@@ -238,7 +238,7 @@ export const aimScene = (): Scene => {
       if (i === 100) teleport(d, p.pos.x + 6, p.pos.y)
       if (i === 200) {
         teleport(d, 27.5, 1.5)
-        arm(p, 'wrench')
+        arm(p, 'pressureLance')
       }
     },
     n: 260,

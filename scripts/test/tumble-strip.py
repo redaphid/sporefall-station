@@ -12,8 +12,8 @@ PX, CX, CY = 32, 640, 376  # tile px, player feet on screen
 # tag, victim tile pos, throw dir (tiles), first tick, last tick
 V = [
     ('east-wall', (45.55, 9), (0.5, 0), 20, 84),
-    ('pistol-plink', (34, 5), (0, -0.5), 65, 129),
-    ('shotgun', (30, 12.5), (-0.5, 0.5), 110, 174),
+    ('rivet-plink', (34, 5), (0, -0.5), 65, 129),
+    ('scatterFunnel', (30, 12.5), (-0.5, 0.5), 110, 174),
     ('sporeling', (30, 9), (-0.5, 0), 155, 219),
     ('grenade', (38.4, 13.4), (0, 0), 210, 290),
 ]

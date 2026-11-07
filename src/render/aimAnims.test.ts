@@ -204,13 +204,13 @@ const playerInput = (i: number): Partial<InputCmd> => {
   if (i < 150) return { ...AIM_EAST, attack: true }
   return { aimX: -1, aimY: 0, moveX: -1 }
 }
-const shooter = (weapon = 'pistol') => {
+const shooter = (weapon = 'rivetDriver') => {
   const w = worldFromRows(walledRoom(30, 20), { seed: 3 })
   const p = tank(w, 20.5, 10.5)
   arm(p, weapon)
   return { w, p }
 }
-const playerSeen = (clips: Partial<Record<AnimStateName, number>>, weapon = 'pistol', before?: (i: number, p: Entity) => void) => {
+const playerSeen = (clips: Partial<Record<AnimStateName, number>>, weapon = 'rivetDriver', before?: (i: number, p: Entity) => void) => {
   const { w, p } = shooter(weapon)
   return watch(w, p, 180, clips, (i) => before?.(i, p), playerInput)
 }
@@ -256,7 +256,7 @@ describe('player aim: the gun stays up and on the aim line whichever way the leg
   })
 
   it('a melee weapon never aims: the same inputs walk and idle', () => {
-    for (const s of playerSeen(AIM_PACK, 'wrench')) expect(aimingState(s.state)).toBe(false)
+    for (const s of playerSeen(AIM_PACK, 'pressureLance')) expect(aimingState(s.state)).toBe(false)
   })
 
   it('missing aim frames: the same inputs never aim (walk, idle, attack exactly as before)', () => {
@@ -266,7 +266,7 @@ describe('player aim: the gun stays up and on the aim line whichever way the leg
   })
 
   it('leaves aim while stunned, downed or picking a lock, and takes it up again after', () => {
-    const seen = playerSeen(AIM_PACK, 'pistol', (i, p) => {
+    const seen = playerSeen(AIM_PACK, 'rivetDriver', (i, p) => {
       if (i === 10) p.status = { stun: 8, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
       if (i === 40) p.playerCtl!.downed = { bleedTicks: 900, reviveProgress: 0 }
       if (i === 50) p.playerCtl!.downed = undefined
@@ -287,7 +287,7 @@ describe('isAiming — adversarial entity states', () => {
       id: 4,
       pos: { x: 5, y: 5 },
       prevPos: { x: 5, y: 5 },
-      combat: { weapon: 'pistol', cooldown: 0 },
+      combat: { weapon: 'rivetDriver', cooldown: 0 },
       ai: { mode: 'aggro', draw: { readyAt: 100 }, ...patch },
       ...extra,
     }) as unknown as Entity
@@ -307,7 +307,7 @@ describe('isAiming — adversarial entity states', () => {
     expect(isAiming(npc({}, { fx: { frozen: { until: 900 } } } as never), 500)).toBe(false)
     expect(isAiming(npc({ dormant: true }), 500)).toBe(false)
     expect(isAiming(npc({}, { dead: true }), 500)).toBe(false)
-    expect(isAiming(npc({}, { combat: { weapon: 'wrench', cooldown: 0 } }), 500)).toBe(false)
+    expect(isAiming(npc({}, { combat: { weapon: 'pressureLance', cooldown: 0 } }), 500)).toBe(false)
     expect(isAiming(npc({}, { combat: undefined }), 500)).toBe(false)
   })
 

@@ -4,9 +4,9 @@
 // stands at (34, 9); sleeping victims stand around it and are killed one beat
 // at a time (SHOTS), each a different case of the throw:
 //   east-wall    full-damage round east into a mutant flush on the wall (x 46)
-//   pistol-plink 14 dmg on a 40-max-hp mutant: under the threshold, the old topple
-//   shotgun      five 7-dmg pellets point blank on a 7-hp mutant, fanned south-west
-//   sporeling    a pistol round finishing a sporeling (14 / 22 = 0.64)
+//   rivet-plink  14 dmg on a 40-max-hp mutant: under the threshold, the old topple
+//   scatterFunnel five 7-dmg pellets point blank on a 7-hp mutant, fanned south-west
+//   sporeling    a Rivet Driver round finishing a sporeling (14 / 22 = 0.64)
 //   grenade-a..c a grenade onto a cluster of three: radial throws, one tick
 //
 // Two passes over the same deterministic run:
@@ -32,8 +32,8 @@ const PLAYER = { x: 34, y: 9 }
  * mutant drawn as that archetype); `max` overrides max hp. */
 export const VICTIMS = [
   { tag: 'east-wall', x: 45.55, y: 9, hp: 24 },
-  { tag: 'pistol-plink', x: 34, y: 5, hp: 14, max: 40 },
-  { tag: 'shotgun', x: 30, y: 12.5, hp: 7 },
+  { tag: 'rivet-plink', x: 34, y: 5, hp: 14, max: 40 },
+  { tag: 'scatterFunnel', x: 30, y: 12.5, hp: 7 },
   { tag: 'sporeling', x: 30, y: 9, hp: 14, max: 22, arch: 'sporeling' },
   { tag: 'grenade-a', x: 38, y: 13, hp: 24 },
   { tag: 'grenade-b', x: 38.9, y: 13.3, hp: 24 },
@@ -45,10 +45,10 @@ const SHOTS = [
   // A full-damage round into a mutant flush against the block's west wall.
   [20, 'east-wall', [[{ x: 42.5, y: 9 }, { x: 14, y: 0 }, 24]]],
   // A pistol plink (14 of 40 max hp) on a mutant: under the threshold.
-  [65, 'pistol-plink', [[{ x: 34, y: 7.6 }, { x: 0, y: -14 }, 14]]],
+  [65, 'rivet-plink', [[{ x: 34, y: 7.6 }, { x: 0, y: -14 }, 14]]],
   // Point-blank shotgun (5 x 7 dmg, 16 tiles/s) finishing a mutant on 7 hp:
   // i-frames void all but the first pellet's hit, so the renderer counts the volley.
-  [110, 'shotgun', [-12, -6, 0, 6, 12].map((d) => [{ x: 31.4, y: 11.1 }, ray(0, 135 + d, 16), 7])],
+  [110, 'scatterFunnel', [-12, -6, 0, 6, 12].map((d) => [{ x: 31.4, y: 11.1 }, ray(0, 135 + d, 16), 7])],
   // A pistol round (14 dmg) finishing a sporeling: 14/22 = 0.64.
   [155, 'sporeling', [[{ x: 32.6, y: 9 }, { x: -14, y: 0 }, 14]]],
   // A grenade lobbed onto the cluster: lands at (38.4, 13.4) after 15 ticks.

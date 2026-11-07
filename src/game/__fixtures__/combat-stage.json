@@ -602,7 +602,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "status": {
@@ -620,7 +620,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "rivetDriver",
             "qty": 200
           }
         ],
@@ -656,7 +656,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "status": {
@@ -706,7 +706,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "status": {
@@ -756,7 +756,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "status": {

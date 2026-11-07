@@ -66,7 +66,7 @@ export const SCENES: readonly Scene[] = [
     title: 'Crossfire',
     hook: 'Wardens and rootcult meet in a crowded plaza. Nobody is after you yet.',
     tryThis: 'Watch them fight, or pick a side. Shoot a bystander and the wardens turn on you too.',
-    tags: ['factions', 'neutral', 'shotgun'],
+    tags: ['factions', 'neutral', 'scatterFunnel'],
   },
   {
     name: 'barracks-blaze',

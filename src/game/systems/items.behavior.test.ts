@@ -69,7 +69,7 @@ describe('item behavior — new guns', () => {
 
   it('flamethrower sets its target burning (onHit)', () => {
     const e = player(w)
-    arm(e, 'flamethrower')
+    arm(e, 'phosphorHose')
     const target = dummy(w, 22, 20)
     fireUntil(w, () => hasStatus(target, 'burning'))
     expect(hasStatus(target, 'burning')).toBe(true)
@@ -77,7 +77,7 @@ describe('item behavior — new guns', () => {
 
   it('flamethrower burn actually chews hp over time (DoT reaches elementSystem)', () => {
     const e = player(w)
-    arm(e, 'flamethrower')
+    arm(e, 'phosphorHose')
     const target = dummy(w, 22, 20)
     fireUntil(w, () => hasStatus(target, 'burning'))
     const afterHit = target.health!.hp // includes the small impact damage
@@ -90,7 +90,7 @@ describe('item behavior — new guns', () => {
 
   it('stun gun electrifies and immobilizes its target (onHit)', () => {
     const e = player(w)
-    arm(e, 'stunGun')
+    arm(e, 'sparkCoil')
     const target = dummy(w, 22, 20)
     fireUntil(w, () => hasStatus(target, 'electrified'))
     expect(hasStatus(target, 'electrified')).toBe(true)
@@ -99,7 +99,7 @@ describe('item behavior — new guns', () => {
 
   it('an electrified player cannot act (combat gated on immobilize)', () => {
     const e = player(w)
-    arm(e, 'wrench')
+    arm(e, 'pressureLance')
     const target = dummy(w, 21, 20)
     e.fx = { electrified: { until: w.tick + 30 } }
     combatSystem(w, attack())
@@ -199,8 +199,8 @@ describe('item behavior — freeze then shatter (element combo through items)', 
     // ties the literal back to a source the game really has.
     const e = player(w, 20, 20)
     const target = dummy(w, 26, 20)
-    arm(e, 'wrench')
-    expect(WEAPONS.freezeRay.onHit!.status).toBe('frozen') // a real, surviving source
+    arm(e, 'pressureLance')
+    expect(WEAPONS.frostCondenser.onHit!.status).toBe('frozen') // a real, surviving source
     // Applied from a distance — a blast radius would freeze the thrower too —
     // then the player closes in and swings.
     applyAreaEffect(w, target.pos.x, target.pos.y, { kind: 'status', status: 'frozen', ticks: 120, radius: 2 }, e.id)
@@ -238,12 +238,12 @@ describe('item data — well-formedness', () => {
 
   it('natural armament is the known set, and only the beast relabels wear out', () => {
     const natural = Object.values(WEAPONS).filter((w) => w.natural)
-    expect(natural.map((w) => w.id).sort()).toEqual(['claws', 'fangs', 'fists', 'horns', 'mandibles'])
+    expect(natural.map((w) => w.id).sort()).toEqual(['claws', 'fangs', 'fists', 'grappleArms', 'horns', 'mandibles'])
     // Fists and claws are innate and never wear. The beast armaments keep the
     // durability of the knife/wrench they relabelled so fights are unchanged
     // (data/beastArmament.test.ts); every one of them is finite.
     for (const id of ['fists', 'claws']) expect(WEAPONS[id].durability, id).toBeUndefined()
-    for (const id of ['fangs', 'mandibles', 'horns']) expect(WEAPONS[id].durability, id).toBeGreaterThan(0)
+    for (const id of ['fangs', 'mandibles', 'horns', 'grappleArms']) expect(WEAPONS[id].durability, id).toBeGreaterThan(0)
   })
 
   it('every weapon onHit / throwable onLand names a status the systems can apply', () => {
@@ -259,7 +259,7 @@ describe('item data — well-formedness', () => {
   })
 
   it('the two new guns are present, ranged, and carry an element onHit', () => {
-    for (const id of ['flamethrower', 'stunGun']) {
+    for (const id of ['phosphorHose', 'sparkCoil']) {
       const wpn = WEAPONS[id]
       expect(wpn, id).toBeDefined()
       expect(wpn.kind).toBe('ranged')

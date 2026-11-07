@@ -129,10 +129,10 @@ describe('nextFloor carry-over', () => {
     const w = makeRun(12)
     const p = w.entities.find((e) => e.playerCtl)!
     p.loadout!.inventory.push({ itemId: 'canister', qty: 1 })
-    p.loadout!.inventory.push({ itemId: 'wrench', qty: 16 })
+    p.loadout!.inventory.push({ itemId: 'pressureLance', qty: 16 })
     nextFloor(w)
     expect(p.loadout!.inventory.some((s) => s.itemId === 'canister')).toBe(false)
-    expect(p.loadout!.inventory.some((s) => s.itemId === 'wrench')).toBe(true)
+    expect(p.loadout!.inventory.some((s) => s.itemId === 'pressureLance')).toBe(true)
   })
 
   it('descending CLEARS a downed state and its channel/misdeed bookkeeping (a downed teammate is carried alive)', () => {

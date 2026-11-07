@@ -39,6 +39,11 @@ export const LEGACY_SAVE_KEY = 'sor.savegame'
  * interpreted. Independent of `WorldJson.v` (which serialize.ts owns): a version
  * mismatch here discards the save and starts a fresh run rather than crashing.
  *
+ * 5 — lore weapons. Every weapon id was renamed (pistol -> rivetDriver, wrench
+ *     -> pressureLance, ...; scripts/rename-weapon-ids.py) and the Spore
+ *     Warden fights with its grapple arms. A pre-rename save holds the old ids
+ *     in loadouts, NPC combat and `pickup.<id>` entities, which would class as
+ *     unknown items (a player with an empty hand). Discard, as in 2.
  * 4 — the cash terminal and the `extraction` mission are gone. A save can hold
  *     that terminal or a mission whose way out is the entry, and neither means
  *     anything to this build.
@@ -58,7 +63,7 @@ export const LEGACY_SAVE_KEY = 'sor.savegame'
  *     be interpreted, not in its shape.
  * 1 — initial.
  */
-export const SAVE_VERSION = 4
+export const SAVE_VERSION = 5
 
 /** Versioned on-disk wrapper around a WorldJson snapshot. */
 export interface SaveEnvelope {

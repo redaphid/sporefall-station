@@ -44,7 +44,7 @@ const table = (label: string, dmg: number, cd: number): void => {
   }
 }
 
-table('this branch', WEAPONS.pistol.damage, WEAPONS.pistol.cooldownTicks)
+table('this branch', WEAPONS.rivetDriver.damage, WEAPONS.rivetDriver.cooldownTicks)
 table('feat/one-weapon (incoming)', 18, 14)
 
 // --- How much of the phase machinery is reachable? --------------------------

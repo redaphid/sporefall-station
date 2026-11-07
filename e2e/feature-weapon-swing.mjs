@@ -53,20 +53,20 @@ const readState = () => {
 const cuts = [
   {
     name: 'weapon-swing-sledgehammer',
-    world: armed('sledgehammer', undefined),
+    world: armed('cageRam', undefined),
     // A heavy weapon that reaches the line and staggers/kills at least one mutant.
-    expect: (s) => [s.weapon !== 'sledgehammer' && 'not wielding the sledgehammer', s.mutantsAlive === 3 && 'sledge never connected', s.gameOver && 'unexpected game over'],
+    expect: (s) => [s.weapon !== 'cageRam' && 'not wielding the sledgehammer', s.mutantsAlive === 3 && 'sledge never connected', s.gameOver && 'unexpected game over'],
   },
   {
     name: 'weapon-swing-wrench',
-    world: armed('wrench', undefined),
-    expect: (s) => [s.weapon !== 'wrench' && 'not wielding the wrench', s.gameOver && 'unexpected game over'],
+    world: armed('pressureLance', undefined),
+    expect: (s) => [s.weapon !== 'pressureLance' && 'not wielding the wrench', s.gameOver && 'unexpected game over'],
   },
   {
     name: 'weapon-swing-sledgehammer-incendiary',
-    world: armed('sledgehammer', [{ id: 'incendiary', stacks: 2 }]),
+    world: armed('cageRam', [{ id: 'incendiary', stacks: 2 }]),
     // Same swing, but the held sprite now wears the incendiary hue + glow.
-    expect: (s) => [s.weapon !== 'sledgehammer' && 'not wielding the modded sledgehammer', s.gameOver && 'unexpected game over'],
+    expect: (s) => [s.weapon !== 'cageRam' && 'not wielding the modded sledgehammer', s.gameOver && 'unexpected game over'],
   },
 ]
 

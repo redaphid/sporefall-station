@@ -11,18 +11,18 @@ describe('hasHeldWeapon', () => {
   })
 
   it('every carried weapon (and an unknown id) may hold art; the pack decides whether any is drawn', () => {
-    expect(hasHeldWeapon('sledgehammer')).toBe(true)
-    expect(hasHeldWeapon('pistol')).toBe(true)
+    expect(hasHeldWeapon('cageRam')).toBe(true)
+    expect(hasHeldWeapon('rivetDriver')).toBe(true)
     expect(hasHeldWeapon('spork-of-doom')).toBe(true)
   })
 })
 
 describe('isMeleeWeapon', () => {
   it('classifies registered weapons by kind', () => {
-    expect(isMeleeWeapon('sledgehammer')).toBe(true)
-    expect(isMeleeWeapon('wrench')).toBe(true)
-    expect(isMeleeWeapon('pistol')).toBe(false)
-    expect(isMeleeWeapon('shotgun')).toBe(false)
+    expect(isMeleeWeapon('cageRam')).toBe(true)
+    expect(isMeleeWeapon('pressureLance')).toBe(true)
+    expect(isMeleeWeapon('rivetDriver')).toBe(false)
+    expect(isMeleeWeapon('scatterFunnel')).toBe(false)
   })
 
   it('treats an unknown id as melee', () => {

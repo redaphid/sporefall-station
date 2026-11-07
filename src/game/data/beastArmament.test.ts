@@ -17,10 +17,10 @@ import type { World } from '../world'
 
 /** Each re-labelled beast, the weapon it carried before, and the one it grows now. */
 const RELABELLED = [
-  { arch: 'gloamhound', was: 'knife', now: 'fangs' },
-  { arch: 'stalker', was: 'knife', now: 'fangs' },
-  { arch: 'lurker', was: 'knife', now: 'mandibles' },
-  { arch: 'brute', was: 'wrench', now: 'horns' },
+  { arch: 'gloamhound', was: 'siphonSpike', now: 'fangs' },
+  { arch: 'stalker', was: 'siphonSpike', now: 'fangs' },
+  { arch: 'lurker', was: 'siphonSpike', now: 'mandibles' },
+  { arch: 'brute', was: 'pressureLance', now: 'horns' },
 ] as const
 
 /** Every field that reaches combat, with the label fields stripped. */
@@ -48,10 +48,10 @@ describe('beast armament — the table', () => {
   })
 
   it('the carried rows are untouched for everyone else', () => {
-    expect(combatFields(WEAPONS.knife)).toEqual({ kind: 'melee', damage: 12, range: 1.1, cooldownTicks: 9, knockback: 2, durability: 20 })
-    expect(combatFields(WEAPONS.wrench)).toEqual({ kind: 'melee', damage: 16, range: 1.3, cooldownTicks: 15, knockback: 7, durability: 16 })
-    expect(WEAPONS.knife.natural).toBeUndefined()
-    expect(WEAPONS.wrench.natural).toBeUndefined()
+    expect(combatFields(WEAPONS.siphonSpike)).toEqual({ kind: 'melee', damage: 12, range: 1.1, cooldownTicks: 9, knockback: 2, durability: 20 })
+    expect(combatFields(WEAPONS.pressureLance)).toEqual({ kind: 'melee', damage: 16, range: 1.3, cooldownTicks: 15, knockback: 7, durability: 16 })
+    expect(WEAPONS.siphonSpike.natural).toBeUndefined()
+    expect(WEAPONS.pressureLance.natural).toBeUndefined()
   })
 })
 

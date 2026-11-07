@@ -31,7 +31,7 @@ s.put(1, 2, 'E')
 
 const w = worldFromState({ level: levelFromJson({ rows: s.rows }), hostile: false })
 const player = spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
-arm(player, 'shotgun', [
+arm(player, 'scatterFunnel', [
   { id: 'choke', stacks: 1 },
   { id: 'heavy', stacks: 1 },
 ])

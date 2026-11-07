@@ -137,8 +137,8 @@ export const stunProbe = (seed: number, ground: Ground, policy: Policy, team: Te
   if (team === 2) addTeammate(w, first)
   const players = playersOf(w)
   const gunner = spawnNpc(w, 'acolyte', first.pos.x + STUN_GUNNER_DIST, first.pos.y)
-  gunner.combat!.weapon = 'stunGun'
-  gunner.loadout = npcLoadout('stunGun')
+  gunner.combat!.weapon = 'sparkCoil'
+  gunner.loadout = npcLoadout('sparkCoil')
 
   const n = players.length
   const run: StunRun = {

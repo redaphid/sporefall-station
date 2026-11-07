@@ -70,24 +70,24 @@ const readState = () => {
 // short on-screen title. `hp` (optional) lets the lifesteal clip start wounded.
 const combos = [
   // ── base weapons (no mods) ──────────────────────────────────────────────
-  { name: 'base-pistol', title: 'Pistol — plain rounds', weapon: 'pistol', mods: [] },
-  { name: 'base-shotgun', title: 'Shotgun — 5-pellet spread', weapon: 'shotgun', mods: [] },
-  { name: 'base-machinegun', title: 'Machine Gun — rapid fire', weapon: 'machinegun', mods: [] },
+  { name: 'base-pistol', title: 'Pistol — plain rounds', weapon: 'rivetDriver', mods: [] },
+  { name: 'base-shotgun', title: 'Shotgun — 5-pellet spread', weapon: 'scatterFunnel', mods: [] },
+  { name: 'base-machinegun', title: 'Machine Gun — rapid fire', weapon: 'coilRepeater', mods: [] },
 
   // ── single mods (the on-hit effect is the star) ─────────────────────────
-  { name: 'weapon-explosive', title: 'Explosive — blows up on impact (AoE)', weapon: 'pistol', mods: [{ id: 'explosive', stacks: 2 }] },
-  { name: 'weapon-pierce', title: 'Piercing — punches through the whole row', weapon: 'pistol', mods: [{ id: 'pierce', stacks: 3 }] },
-  { name: 'weapon-frost', title: 'Cryo Rounds — freeze, then shatter', weapon: 'pistol', mods: [{ id: 'frost', stacks: 1 }] },
-  { name: 'weapon-incendiary', title: 'Incendiary — sets them on fire', weapon: 'pistol', mods: [{ id: 'incendiary', stacks: 1 }] },
-  { name: 'weapon-splinter', title: 'Splinter Shot — shrapnel burst on hit', weapon: 'pistol', mods: [{ id: 'splinterShot', stacks: 3 }] },
-  { name: 'weapon-bounce', title: 'Bouncy — bullets ricochet', weapon: 'pistol', mods: [{ id: 'bounce', stacks: 2 }] },
-  { name: 'weapon-velocity', title: 'Hot Loads — bullets scream downrange', weapon: 'pistol', mods: [{ id: 'velocity', stacks: 3 }] },
-  { name: 'weapon-shock', title: 'Tesla Rounds — zap & stun', weapon: 'pistol', mods: [{ id: 'shock', stacks: 1 }] },
-  { name: 'weapon-lifesteal', title: 'Vampiric — heal on every hit', weapon: 'machinegun', mods: [{ id: 'lifesteal', stacks: 3 }, { id: 'rapid', stacks: 1 }], hp: 40 },
+  { name: 'weapon-explosive', title: 'Explosive — blows up on impact (AoE)', weapon: 'rivetDriver', mods: [{ id: 'explosive', stacks: 2 }] },
+  { name: 'weapon-pierce', title: 'Piercing — punches through the whole row', weapon: 'rivetDriver', mods: [{ id: 'pierce', stacks: 3 }] },
+  { name: 'weapon-frost', title: 'Cryo Rounds — freeze, then shatter', weapon: 'rivetDriver', mods: [{ id: 'frost', stacks: 1 }] },
+  { name: 'weapon-incendiary', title: 'Incendiary — sets them on fire', weapon: 'rivetDriver', mods: [{ id: 'incendiary', stacks: 1 }] },
+  { name: 'weapon-splinter', title: 'Splinter Shot — shrapnel burst on hit', weapon: 'rivetDriver', mods: [{ id: 'splinterShot', stacks: 3 }] },
+  { name: 'weapon-bounce', title: 'Bouncy — bullets ricochet', weapon: 'rivetDriver', mods: [{ id: 'bounce', stacks: 2 }] },
+  { name: 'weapon-velocity', title: 'Hot Loads — bullets scream downrange', weapon: 'rivetDriver', mods: [{ id: 'velocity', stacks: 3 }] },
+  { name: 'weapon-shock', title: 'Tesla Rounds — zap & stun', weapon: 'rivetDriver', mods: [{ id: 'shock', stacks: 1 }] },
+  { name: 'weapon-lifesteal', title: 'Vampiric — heal on every hit', weapon: 'coilRepeater', mods: [{ id: 'lifesteal', stacks: 3 }, { id: 'rapid', stacks: 1 }], hp: 40 },
 
   // ── combos (mods stack) ─────────────────────────────────────────────────
-  { name: 'combo-pierce-explosive', title: 'Pierce + Explosive — pass through & boom', weapon: 'pistol', mods: [{ id: 'pierce', stacks: 2 }, { id: 'explosive', stacks: 2 }] },
-  { name: 'combo-shock-then-frost', title: 'Tesla, then Cryo — the newest element (Cryo) lands', weapon: 'pistol', mods: [{ id: 'shock', stacks: 1 }, { id: 'frost', stacks: 1 }] },
+  { name: 'combo-pierce-explosive', title: 'Pierce + Explosive — pass through & boom', weapon: 'rivetDriver', mods: [{ id: 'pierce', stacks: 2 }, { id: 'explosive', stacks: 2 }] },
+  { name: 'combo-shock-then-frost', title: 'Tesla, then Cryo — the newest element (Cryo) lands', weapon: 'rivetDriver', mods: [{ id: 'shock', stacks: 1 }, { id: 'frost', stacks: 1 }] },
 ]
 
 // Optional `COMBO_FILTER=weapon-frost` to record a single clip (for iteration).

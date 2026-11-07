@@ -67,7 +67,7 @@ describe('payload vs modifier classification', () => {
 })
 
 describe('planCasts (pure)', () => {
-  const pistol = sequenceShape(WEAPONS.pistol)
+  const pistol = sequenceShape(WEAPONS.rivetDriver)
 
   it('advances one payload per cast and wraps at the end', () => {
     const mods = [m('frost'), m('incendiary'), m('shock')]
@@ -105,7 +105,7 @@ describe('planCasts (pure)', () => {
   })
 
   it('castsPerTrigger > 1 takes consecutive casts and stops at a wrap', () => {
-    const shot = sequenceShape(WEAPONS.shotgun)
+    const shot = sequenceShape(WEAPONS.scatterFunnel)
     expect(shot.castsPerTrigger).toBe(2)
     const mods = [m('frost'), m('incendiary'), m('shock')]
     const first = planCasts(mods, shot, 0)
@@ -139,7 +139,7 @@ describe('planCasts (pure)', () => {
 
 describe('the fire path (combatSystem)', () => {
   it('the locker-7 pistol fires frost, fire, shock in order, one element per round', () => {
-    const { w, p } = rig('pistol', [m('frost'), m('incendiary'), m('shock')])
+    const { w, p } = rig('rivetDriver', [m('frost'), m('incendiary'), m('shock')])
     const got = [pull(w, p), pull(w, p), pull(w, p)]
     expect(got.map(elements)).toEqual([['frozen'], ['burning'], ['electrified']])
     // Each round advertises only its own cast's mods on the wire.
@@ -147,18 +147,18 @@ describe('the fire path (combatSystem)', () => {
   })
 
   it('the index advances per shot and wraps to 0, starting a recharge', () => {
-    const { w, p } = rig('pistol', [m('frost'), m('shock')])
+    const { w, p } = rig('rivetDriver', [m('frost'), m('shock')])
     pull(w, p)
     expect(stackOf(p).castIndex).toBe(1)
     expect(stackOf(p).rechargeUntil).toBeUndefined()
     pull(w, p)
     expect(stackOf(p).castIndex).toBe(0)
-    expect(stackOf(p).rechargeUntil).toBe(w.tick + WEAPONS.pistol.rechargeOnWrap!)
-    expect(p.combat!.cooldown).toBe(WEAPONS.pistol.rechargeOnWrap!)
+    expect(stackOf(p).rechargeUntil).toBe(w.tick + WEAPONS.rivetDriver.rechargeOnWrap!)
+    expect(p.combat!.cooldown).toBe(WEAPONS.rivetDriver.rechargeOnWrap!)
   })
 
   it('recharge blocks firing until it elapses, then the sequence restarts at the top', () => {
-    const { w, p } = rig('pistol', [m('frost'), m('shock')])
+    const { w, p } = rig('rivetDriver', [m('frost'), m('shock')])
     pull(w, p)
     pull(w, p) // wraps
     const until = stackOf(p).rechargeUntil!
@@ -168,7 +168,7 @@ describe('the fire path (combatSystem)', () => {
   })
 
   it('a held trigger through tickWorld respects cooldown and recharge timing', () => {
-    const { w, p } = rig('pistol', [m('frost'), m('shock')])
+    const { w, p } = rig('rivetDriver', [m('frost'), m('shock')])
     const fired: { tick: number; el?: string }[] = []
     for (let t = 0; t < 120; t++) {
       const before = new Set(w.entities.map((e) => e.id))
@@ -176,8 +176,8 @@ describe('the fire path (combatSystem)', () => {
       tickWorld(w, new Map([[0, { ...emptyInput(), attack: true }]]))
       for (const e of w.entities) if (!before.has(e.id) && e.projectile && e.projectile.ownerId === p.id) fired.push({ tick, el: e.projectile.onHit?.status })
     }
-    const cd = WEAPONS.pistol.cooldownTicks
-    const rc = WEAPONS.pistol.rechargeOnWrap!
+    const cd = WEAPONS.rivetDriver.cooldownTicks
+    const rc = WEAPONS.rivetDriver.rechargeOnWrap!
     expect(fired.slice(0, 4)).toEqual([
       { tick: 0, el: 'frozen' },
       { tick: cd, el: 'electrified' },
@@ -187,19 +187,19 @@ describe('the fire path (combatSystem)', () => {
   })
 
   it('modifier then payload: overload boosts the frost round only, then shock fires plain-damage', () => {
-    const { w, p } = rig('pistol', [m('overload', 2), m('frost'), m('shock')])
+    const { w, p } = rig('rivetDriver', [m('overload', 2), m('frost'), m('shock')])
     const [a] = pull(w, p)
     const [b] = pull(w, p)
     expect(a.projectile!.onHit?.status).toBe('frozen')
-    expect(a.projectile!.damage).toBe(Math.round(WEAPONS.pistol.damage * 1.25 * 1.25))
+    expect(a.projectile!.damage).toBe(Math.round(WEAPONS.rivetDriver.damage * 1.25 * 1.25))
     expect(b.projectile!.onHit?.status).toBe('electrified')
-    expect(b.projectile!.damage).toBe(WEAPONS.pistol.damage)
+    expect(b.projectile!.damage).toBe(WEAPONS.rivetDriver.damage)
   })
 
   it('shotgun: each pellet group carries the next mod in sequence', () => {
-    const { w, p } = rig('shotgun', [m('frost'), m('incendiary'), m('shock')])
+    const { w, p } = rig('scatterFunnel', [m('frost'), m('incendiary'), m('shock')])
     const first = pull(w, p)
-    expect(first).toHaveLength(WEAPONS.shotgun.pellets!)
+    expect(first).toHaveLength(WEAPONS.scatterFunnel.pellets!)
     expect(elements(first)).toEqual(['frozen', 'frozen', 'frozen', 'burning', 'burning'])
     const second = pull(w, p) // one cast left before the wrap: only the shock group
     expect(elements(second)).toEqual(['electrified', 'electrified', 'electrified'])
@@ -208,16 +208,16 @@ describe('the fire path (combatSystem)', () => {
   })
 
   it('melee (mods reach melee today): one mod per swing', () => {
-    const { w, p } = rig('sledgehammer', [m('incendiary'), m('shock')])
+    const { w, p } = rig('cageRam', [m('incendiary'), m('shock')])
     pull(w, p)
     expect(stackOf(p).castIndex).toBe(1)
     pull(w, p)
     expect(stackOf(p).castIndex).toBe(0)
-    expect(stackOf(p).rechargeUntil).toBe(w.tick + WEAPONS.sledgehammer.rechargeOnWrap!)
+    expect(stackOf(p).rechargeUntil).toBe(w.tick + WEAPONS.cageRam.rechargeOnWrap!)
   })
 
   it('a weapon with no mods fires the bare weapon and grows no sequence state', () => {
-    const { w, p } = rig('pistol', [])
+    const { w, p } = rig('rivetDriver', [])
     delete stackOf(p).mods
     expect(pull(w, p)).toHaveLength(1)
     expect(stackOf(p).castIndex).toBeUndefined()
@@ -242,17 +242,17 @@ describe('a one-cast wand fires like a plain gun (#115)', () => {
   const armedKit = [m('heavy', 2), m('homing'), m('lifesteal', 2), m('pierce', 2), m('rapid')]
 
   it('the armed machine gun (modifiers only) fires at its cooldown and never recharges', () => {
-    const { w, p } = rig('machinegun', armedKit)
+    const { w, p } = rig('coilRepeater', armedKit)
     const fired = heldFire(w, p, 90)
-    const cd = executedShot(WEAPONS.machinegun, armedKit).cooldownTicks
+    const cd = executedShot(WEAPONS.coilRepeater, armedKit).cooldownTicks
     expect(fired.map((f) => f.tick)).toEqual(Array.from({ length: Math.ceil(90 / cd) }, (_, i) => i * cd))
     expect(stackOf(p).rechargeUntil).toBeUndefined()
     expect(stackOf(p).castIndex).toBeUndefined()
   })
 
   it('every round of a modifiers-only wand carries every live mod at the full-kit stats', () => {
-    const { w, p } = rig('machinegun', armedKit)
-    const kit = executedShot(WEAPONS.machinegun, armedKit)
+    const { w, p } = rig('coilRepeater', armedKit)
+    const kit = executedShot(WEAPONS.coilRepeater, armedKit)
     for (let i = 0; i < 3; i++) {
       const [round] = pull(w, p)
       expect(round.projectile!.mods).toEqual(normalizeMods(armedKit))
@@ -261,36 +261,36 @@ describe('a one-cast wand fires like a plain gun (#115)', () => {
   })
 
   it('a lone element fires every round, at the cooldown, with no recharge', () => {
-    const { w, p } = rig('pistol', [m('frost')])
+    const { w, p } = rig('rivetDriver', [m('frost')])
     const fired = heldFire(w, p, 60)
-    const cd = WEAPONS.pistol.cooldownTicks
+    const cd = WEAPONS.rivetDriver.cooldownTicks
     expect(fired).toEqual([0, cd, 2 * cd, 3 * cd].map((tick) => ({ tick, pellets: 1, el: 'frozen' })))
     expect(stackOf(p).rechargeUntil).toBeUndefined()
   })
 
   it('modifiers ending on one element are one cast: overload rides every frost round', () => {
-    const { w, p } = rig('pistol', [m('overload', 2), m('frost')])
+    const { w, p } = rig('rivetDriver', [m('overload', 2), m('frost')])
     const shots = [pull(w, p), pull(w, p), pull(w, p)].flat()
     expect(elements(shots)).toEqual(['frozen', 'frozen', 'frozen'])
-    for (const s of shots) expect(s.projectile!.damage).toBe(Math.round(WEAPONS.pistol.damage * 1.25 * 1.25))
+    for (const s of shots) expect(s.projectile!.damage).toBe(Math.round(WEAPONS.rivetDriver.damage * 1.25 * 1.25))
     expect(stackOf(p).rechargeUntil).toBeUndefined()
   })
 
   it('a one-cast shotgun fires all its pellets every pull, not a 3-pellet half', () => {
-    const { w, p } = rig('shotgun', [m('pierce')])
-    for (let i = 0; i < 3; i++) expect(pull(w, p)).toHaveLength(WEAPONS.shotgun.pellets!)
+    const { w, p } = rig('scatterFunnel', [m('pierce')])
+    for (let i = 0; i < 3; i++) expect(pull(w, p)).toHaveLength(WEAPONS.scatterFunnel.pellets!)
     expect(stackOf(p).rechargeUntil).toBeUndefined()
   })
 
   it('a one-cast sledgehammer swings at its cooldown, not its 75-tick recharge', () => {
-    const { w, p } = rig('sledgehammer', [m('heavy')])
+    const { w, p } = rig('cageRam', [m('heavy')])
     pull(w, p)
-    expect(p.combat!.cooldown).toBe(executedShot(WEAPONS.sledgehammer, [m('heavy')]).cooldownTicks)
+    expect(p.combat!.cooldown).toBe(executedShot(WEAPONS.cageRam, [m('heavy')]).cooldownTicks)
     expect(stackOf(p).rechargeUntil).toBeUndefined()
   })
 
   it('a stale castIndex on a one-cast wand still fires the whole cast', () => {
-    const { w, p } = rig('pistol', [m('overload'), m('frost')])
+    const { w, p } = rig('rivetDriver', [m('overload'), m('frost')])
     stackOf(p).castIndex = 1
     const [shot] = pull(w, p)
     expect(shot.projectile!.mods!.map((x) => x.id)).toEqual(['frost', 'overload'])
@@ -298,7 +298,7 @@ describe('a one-cast wand fires like a plain gun (#115)', () => {
   })
 
   it('stowed and unknown entries do not make a cycle: one live cast is still a plain gun', () => {
-    const { w, p } = rig('pistol', [m('bogus'), m('frost', 0), m('heavy'), m('pierce'), m('rapid'), m('bounce'), m('shock')])
+    const { w, p } = rig('rivetDriver', [m('bogus'), m('frost', 0), m('heavy'), m('pierce'), m('rapid'), m('bounce'), m('shock')])
     // Live window (4 slots): heavy, pierce, rapid, bounce. Shock is stowed.
     const fired = heldFire(w, p, 40)
     expect(fired.every((f) => f.el === undefined)).toBe(true)
@@ -307,22 +307,22 @@ describe('a one-cast wand fires like a plain gun (#115)', () => {
   })
 
   it('a modifier after the only element makes two casts, so the wrap still recharges', () => {
-    const { w, p } = rig('pistol', [m('frost'), m('heavy')])
+    const { w, p } = rig('rivetDriver', [m('frost'), m('heavy')])
     expect(elements(pull(w, p))).toEqual(['frozen'])
     expect(elements(pull(w, p))).toEqual([undefined])
-    expect(stackOf(p).rechargeUntil).toBe(w.tick + WEAPONS.pistol.rechargeOnWrap!)
+    expect(stackOf(p).rechargeUntil).toBe(w.tick + WEAPONS.rivetDriver.rechargeOnWrap!)
   })
 
   it('cycleCasts counts casts to the wrap; planPull drops the recharge only for a one-cast cycle', () => {
-    const pistol = sequenceShape(WEAPONS.pistol)
+    const pistol = sequenceShape(WEAPONS.rivetDriver)
     expect(cycleCasts([], pistol)).toBe(0)
     expect(cycleCasts(armedKit, pistol)).toBe(1)
     expect(cycleCasts([m('overload'), m('frost')], pistol)).toBe(1)
     expect(cycleCasts([m('frost'), m('overload')], pistol)).toBe(2)
     expect(cycleCasts([m('frost'), m('incendiary'), m('shock')], pistol)).toBe(3)
-    expect(planPull(WEAPONS.pistol, [m('frost')], 0).shape.rechargeOnWrap).toBe(0)
-    expect(planPull(WEAPONS.shotgun, [m('frost')], 0).shape.castsPerTrigger).toBe(1)
-    expect(planPull(WEAPONS.pistol, [m('frost'), m('shock')], 0).shape).toEqual(pistol)
+    expect(planPull(WEAPONS.rivetDriver, [m('frost')], 0).shape.rechargeOnWrap).toBe(0)
+    expect(planPull(WEAPONS.scatterFunnel, [m('frost')], 0).shape.castsPerTrigger).toBe(1)
+    expect(planPull(WEAPONS.rivetDriver, [m('frost'), m('shock')], 0).shape).toEqual(pistol)
   })
 })
 
@@ -331,7 +331,7 @@ describe('reordering', () => {
     new Map([[0, { ...emptyInput(), modSwap: packModSwap(a, b) }]])
 
   it('a swap input reorders the list; the index stays put and fires what now sits there', () => {
-    const { w, p } = rig('pistol', [m('frost'), m('incendiary'), m('shock')])
+    const { w, p } = rig('rivetDriver', [m('frost'), m('incendiary'), m('shock')])
     pull(w, p) // frost; index -> 1
     combatSystem(w, swapInput(1, 2))
     expect(stackOf(p).mods!.map((x) => x.id)).toEqual(['frost', 'shock', 'incendiary'])
@@ -340,7 +340,7 @@ describe('reordering', () => {
   })
 
   it('reordering does not cancel a recharge', () => {
-    const { w, p } = rig('pistol', [m('frost'), m('shock')])
+    const { w, p } = rig('rivetDriver', [m('frost'), m('shock')])
     pull(w, p)
     pull(w, p)
     const until = stackOf(p).rechargeUntil
@@ -350,20 +350,20 @@ describe('reordering', () => {
   })
 
   it('a stowed mod can be swapped into the live window', () => {
-    const { w, p } = rig('pistol', [m('frost'), m('incendiary'), m('shock'), m('overload'), m('pierce')])
+    const { w, p } = rig('rivetDriver', [m('frost'), m('incendiary'), m('shock'), m('overload'), m('pierce')])
     combatSystem(w, swapInput(0, 4))
     expect(liveEntries(stackOf(p).mods, 4).map((i) => stackOf(p).mods![i].id)).toEqual(['pierce', 'incendiary', 'shock', 'overload'])
   })
 
   it('a swap is applied even mid-roll or stunned', () => {
-    const { w, p } = rig('pistol', [m('frost'), m('shock')])
+    const { w, p } = rig('rivetDriver', [m('frost'), m('shock')])
     p.status!.stun = 10
     combatSystem(w, swapInput(0, 1))
     expect(stackOf(p).mods!.map((x) => x.id)).toEqual(['shock', 'frost'])
   })
 
   it('adversarial swaps (out of range, self, garbage) are ignored', () => {
-    const { p } = rig('pistol', [m('frost'), m('shock')])
+    const { p } = rig('rivetDriver', [m('frost'), m('shock')])
     for (const v of [packModSwap(0, 0), packModSwap(0, 9), packModSwap(200, 1), -5, 1.5, NaN]) expect(applyModSwap(p, v)).toBe(false)
     expect(stackOf(p).mods!.map((x) => x.id)).toEqual(['frost', 'shock'])
   })
@@ -371,7 +371,7 @@ describe('reordering', () => {
 
 describe('save/load', () => {
   it('castIndex and rechargeUntil survive a serialize round-trip and resume identically', () => {
-    const { w, p } = rig('pistol', [m('frost'), m('incendiary'), m('shock')])
+    const { w, p } = rig('rivetDriver', [m('frost'), m('incendiary'), m('shock')])
     pull(w, p)
     pull(w, p)
     pull(w, p) // wrapped: index 0, recharging
@@ -389,7 +389,7 @@ describe('save/load', () => {
   })
 
   it('a mid-sequence index survives the round-trip', () => {
-    const { w, p } = rig('pistol', [m('frost'), m('incendiary'), m('shock')])
+    const { w, p } = rig('rivetDriver', [m('frost'), m('incendiary'), m('shock')])
     pull(w, p)
     const back = deserializeWorld(JSON.parse(JSON.stringify(serializeWorld(w))))
     expect(weaponStack(back.byId.get(p.id)!)!.castIndex).toBe(1)

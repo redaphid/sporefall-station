@@ -56,9 +56,9 @@ export const ARCHETYPES = [
   'projectile',
   'grenade',
   'door',
-  'pickup.wrench',
-  'pickup.knife',
-  'pickup.pistol',
+  'pickup.wrench', // RETIRED (lore weapons, PROTOCOL_VERSION 15)
+  'pickup.knife', // RETIRED (lore weapons, PROTOCOL_VERSION 15)
+  'pickup.pistol', // RETIRED (lore weapons, PROTOCOL_VERSION 15)
   'pickup.bandage', // RETIRED
   'pickup.medkit', // RETIRED
   'pickup.cash',
@@ -126,18 +126,18 @@ export const ARCHETYPES = [
   'pickup.chloroform', // RETIRED
   'pickup.claws',
   'pickup.fists',
-  'pickup.flamethrower',
+  'pickup.flamethrower', // RETIRED (lore weapons, PROTOCOL_VERSION 15)
   'pickup.freezeGrenade', // RETIRED
-  'pickup.freezeRay',
+  'pickup.freezeRay', // RETIRED (lore weapons, PROTOCOL_VERSION 15)
   'pickup.gasGrenade', // RETIRED
   'pickup.grenade',
   'pickup.keycard',
-  'pickup.machinegun',
+  'pickup.machinegun', // RETIRED (lore weapons, PROTOCOL_VERSION 15)
   'pickup.molotov', // RETIRED
-  'pickup.shotgun',
-  'pickup.sledgehammer',
-  'pickup.stunGun',
-  'pickup.tranquilizer',
+  'pickup.shotgun', // RETIRED (lore weapons, PROTOCOL_VERSION 15)
+  'pickup.sledgehammer', // RETIRED (lore weapons, PROTOCOL_VERSION 15)
+  'pickup.stunGun', // RETIRED (lore weapons, PROTOCOL_VERSION 15)
+  'pickup.tranquilizer', // RETIRED (lore weapons, PROTOCOL_VERSION 15)
   'plant',
   'shelf',
   'spore',
@@ -159,6 +159,19 @@ export const ARCHETYPES = [
   'lobber',
   'gloamhound',
   'hivespire',
+  // PROTOCOL_VERSION 15 — the lore weapons (scripts/rename-weapon-ids.py): the
+  // mundane pistol/wrench/knife/... became colony still-sections. The old
+  // pickup names above are RETIRED in place. APPEND ONLY, at the end.
+  'pickup.rivetDriver',
+  'pickup.pressureLance',
+  'pickup.siphonSpike',
+  'pickup.cageRam',
+  'pickup.scatterFunnel',
+  'pickup.coilRepeater',
+  'pickup.phosphorHose',
+  'pickup.frostCondenser',
+  'pickup.lullDarter',
+  'pickup.sparkCoil',
 ] as const
 
 /** The wing keycard's archetype carries a dynamic `.wing<n>` suffix

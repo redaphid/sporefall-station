@@ -50,7 +50,7 @@ const state = (page) =>
       weapon: s.combat ? s.combat.weapon : null,
       activeSlot: s.playerCtl.activeSlot,
       slots,
-      pistolAmmo: ammoOf('pistol'),
+      pistolAmmo: ammoOf('rivetDriver'),
       grenades: ammoOf('grenade'),
       fires,
     }
@@ -94,7 +94,7 @@ const main = async () => {
   const start = await state(page)
   log('loadout', JSON.stringify(start))
   await screenshot(page, 'loadout')
-  check(start.weapon === 'wrench', 'starts equipped with the wrench (slot 0)')
+  check(start.weapon === 'pressureLance', 'starts equipped with the wrench (slot 0)')
   check(start.pistolAmmo === 3 && start.grenades === 2, 'hotbar holds pistol (3) + grenade (2)')
 
   // EQUIP the pistol via hotbar key "2".
@@ -103,7 +103,7 @@ const main = async () => {
   const equipped = await state(page)
   log('after equip 2', JSON.stringify(equipped))
   await screenshot(page, 'pistol-equipped')
-  check(equipped.weapon === 'pistol' && equipped.activeSlot === 1, 'pressing 2 equips the pistol')
+  check(equipped.weapon === 'rivetDriver' && equipped.activeSlot === 1, 'pressing 2 equips the pistol')
 
   // FIRE until empty: hold-tap Space; cooldown is ~0.6s.
   let ammo = equipped.pistolAmmo
@@ -122,7 +122,7 @@ const main = async () => {
   await sleep(400)
   const afterEmpty = await state(page)
   check(afterEmpty.pistolAmmo === 0, 'empty gun cannot fire (ammo stays 0)')
-  check(afterEmpty.slots.some((s) => s.itemId === 'pistol'), 'empty gun stays in the inventory')
+  check(afterEmpty.slots.some((s) => s.itemId === 'rivetDriver'), 'empty gun stays in the inventory')
 
   // THROW a grenade via key "Q".
   await page.keyboard.press('KeyQ')

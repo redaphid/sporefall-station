@@ -110,7 +110,7 @@
         "iframes": 90
       },
       "combat": {
-        "weapon": "machinegun",
+        "weapon": "coilRepeater",
         "cooldown": 0
       },
       "status": {
@@ -122,7 +122,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "machinegun",
+            "itemId": "coilRepeater",
             "qty": 1,
             "mods": [
               {
@@ -182,13 +182,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "rivetDriver",
             "qty": 1
           }
         ],
@@ -307,13 +307,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "rivetDriver",
             "qty": 1
           }
         ],
@@ -374,13 +374,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "rivetDriver",
             "qty": 1
           }
         ],
@@ -441,13 +441,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "rivetDriver",
             "qty": 1
           }
         ],

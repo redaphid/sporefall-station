@@ -30,7 +30,7 @@ const player = (weaponId: string, mods?: { id: string; stacks: number }[]): Enti
   }) as Entity
 
 // A juicy build: shotgun with a spread of stat + behavior + element mods.
-const hero = player('shotgun', [
+const hero = player('scatterFunnel', [
   { id: 'overload', stacks: 2 },
   { id: 'incendiary', stacks: 1 },
   { id: 'pierce', stacks: 3 },

@@ -53,7 +53,7 @@ const BASE: WorldJson = (() => {
   const w = createWorld(1, 1)
   const p = spawnPlayer(w, 0, 20, 20)
   p.loadout!.inventory = []
-  arm(p, 'machinegun')
+  arm(p, 'coilRepeater')
   p.facing = 0
   body(w, 24, 20, 1)
   for (const [x, y] of [[24.8, 20.9], [24.8, 19.1], [23.4, 21.1]]) body(w, x, y, 400)

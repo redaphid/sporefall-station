@@ -20,7 +20,7 @@ import { spawnObject } from '../../src/game/systems/objects'
 import { createWorld, type World } from '../../src/game/world'
 import type { Entity } from '../../src/game/entity'
 
-const PISTOL = WEAPONS.pistol
+const PISTOL = WEAPONS.rivetDriver
 const FROST = MODS.frost.onHit!
 
 /** One shot through the projectile path's ordering. Advances the world tick by
@@ -91,12 +91,12 @@ console.log('\n=== enemy-on-enemy: can an NPC freeze ray + any impact execute an
   const victim = spawnNpc(w, 'boss', 5, 5)
   const shooter = spawnNpc(w, 'mutant', 6, 5)
   // NPC freeze ray: 0 damage, onHit frozen 120t (WEAPONS.freezeRay)
-  const ray = WEAPONS.freezeRay
+  const ray = WEAPONS.frostCondenser
   const d = applyDamage(w, victim, ray.damage, 6, 5, 0, shooter.id)
   if (d !== null) applyStatus(w, victim, ray.onHit!.status, ray.onHit!.ticks)
   for (let i = 0; i < 20; i++) { statusSystem(w); w.tick++ }
   console.log(`boss frozen by an NPC freeze ray: ${isFrozen(victim)} (hp ${victim.health!.hp}/${victim.health!.max})`)
   // ...then any other enemy lands a wrench swing on it
-  const dealt = applyDamage(w, victim, WEAPONS.wrench.damage, 6, 5, 0, shooter.id)
+  const dealt = applyDamage(w, victim, WEAPONS.pressureLance.damage, 6, 5, 0, shooter.id)
   console.log(`after one 16-dmg wrench swing from another NPC: dead=${victim.dead} shattered=${!!victim.shattered} reported=${dealt}`)
 }

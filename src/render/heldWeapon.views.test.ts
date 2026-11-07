@@ -78,7 +78,7 @@ interface Rig {
 }
 
 const rig = (
-  weapons: Record<string, HeldWeaponArt> = { pistol: placeholderWeapon('pistol'), wrench: placeholderWeapon('wrench', 0) },
+  weapons: Record<string, HeldWeaponArt> = { rivetDriver: placeholderWeapon('rivetDriver'), pressureLance: placeholderWeapon('pressureLance', 0) },
 ): Rig => {
   const sprites: SpriteTextures = {
     artScale: GRID,
@@ -115,7 +115,7 @@ const holding = (weaponId: string, archetype = 'drowner'): Entity => {
 }
 
 const aimedAt = (facing: number): Entity => {
-  const e = holding('pistol')
+  const e = holding('rivetDriver')
   e.facing = facing
   e.ai!.mode = 'aggro' // engaged: weapon up
   return e
@@ -134,7 +134,7 @@ const HEADINGS = RING.map((name, i) => ({ name, facing: (i * Math.PI) / 4 }))
 
 describe('pack art only: no drawn art, nothing held', () => {
   it('a weapon with no pack frames draws nothing (no procedural stand-in)', () => {
-    const r = drawn(holding('sledgehammer'))
+    const r = drawn(holding('cageRam'))
     expect(held(r)).toHaveLength(0)
     expect(sprites(r)).toHaveLength(1) // just the body
   })
@@ -144,7 +144,7 @@ describe('pack art only: no drawn art, nothing held', () => {
   })
 
   it('the pistol with pack frames draws exactly one weapon sprite', () => {
-    expect(held(drawn(holding('pistol')))).toHaveLength(1)
+    expect(held(drawn(holding('rivetDriver')))).toHaveLength(1)
   })
 })
 
@@ -165,21 +165,21 @@ describe('per-facing drawings: each facing shows its own view', () => {
   })
 
   it('a missing view borrows its neighbour rather than vanishing', () => {
-    const only = placeholderWeapon('pistol')
+    const only = placeholderWeapon('rivetDriver')
     delete only.s
     delete only.se
-    const [w] = held(drawn(aimedAt(Math.PI / 2), rig({ pistol: only })))
+    const [w] = held(drawn(aimedAt(Math.PI / 2), rig({ rivetDriver: only })))
     expect(viewOf(w)).toBe('e')
   })
 
   it('low-ready (calm NPC, never fired) lowers the profile gun to the se drawing', () => {
-    const e = holding('pistol')
+    const e = holding('rivetDriver')
     e.ai!.mode = 'idle'
     expect(viewOf(held(drawn(e))[0])).toBe('se')
   })
 
   it('a shot raises it: the frame after the cooldown jumps shows the level e drawing', () => {
-    const e = holding('pistol')
+    const e = holding('rivetDriver')
     e.ai!.mode = 'idle'
     const r = rig()
     r.views.update([e], 0, 100, 0)
@@ -210,11 +210,11 @@ describe('the pixel grid: unscaled, unrotated, on whole art pixels', () => {
   })
 
   it('a maxed mod skin tints the weapon but never scales it', () => {
-    const e = holding('pistol')
+    const e = holding('rivetDriver')
     e.loadout = {
       inventory: [
         {
-          itemId: 'pistol',
+          itemId: 'rivetDriver',
           qty: 1,
           mods: [
             { id: 'heavy', stacks: 9 },
@@ -270,7 +270,7 @@ describe('in the hand: the grip sits on the fist the frame draws', () => {
     const e = aimedAt(0)
     const r = rig()
     // A body frame the fist table does not know: the procedural set of a player.
-    const p = holding('pistol', 'player')
+    const p = holding('rivetDriver', 'player')
     p.facing = 0
     r.views.update([p], 0, 100, 0)
     const [w] = held(r)
@@ -317,7 +317,7 @@ describe('animated: idle loop and attack one-shot', () => {
       r.views.update([e], 0, t, 0)
       seen.add(held(r)[0].texture.label!)
     }
-    expect([...seen].sort()).toEqual(['pistol.e-idle-0', 'pistol.e-idle-1'])
+    expect([...seen].sort()).toEqual(['rivetDriver.e-idle-0', 'rivetDriver.e-idle-1'])
   })
 
   it('a shot plays the attack frames in order over the attack window, then back to idle', () => {
@@ -331,13 +331,13 @@ describe('animated: idle loop and attack one-shot', () => {
       labels.push(held(r)[0].texture.label!)
     }
     const attack = labels.filter((l) => l.includes('attack'))
-    expect(attack[0]).toBe('pistol.e-attack-0')
-    expect(new Set(attack)).toEqual(new Set(['pistol.e-attack-0', 'pistol.e-attack-1', 'pistol.e-attack-2']))
+    expect(attack[0]).toBe('rivetDriver.e-attack-0')
+    expect(new Set(attack)).toEqual(new Set(['rivetDriver.e-attack-0', 'rivetDriver.e-attack-1', 'rivetDriver.e-attack-2']))
     expect(labels.at(-1)).toMatch(/idle/)
   })
 
   it('a melee weapon with no drawn swing chops through the per-sector drawings', () => {
-    const e = holding('wrench')
+    const e = holding('pressureLance')
     const r = rig()
     r.views.update([e], 0, 100, 0)
     e.combat!.cooldown = 15
@@ -388,6 +388,90 @@ describe('held weapon VISIBILITY — beasts bite, people hold', () => {
     expect(sprites(r)).toHaveLength(3) // body, weapon, cap
     e.combat!.weapon = 'fangs'
     r.views.update([e], 0, 101, 0)
+    expect(sprites(r)).toHaveLength(1)
+  })
+})
+
+// 5. MODS LIGHT THE ACCENT, NOT THE SPRITE. A view that ships a `glow` layer
+//    (the essence accent alone) keeps the weapon's own colours and colours only
+//    that layer from the mods; mod attachments draw over it in MOD_LAYER_ORDER.
+describe('mod-lit accent and attachment layers', () => {
+  const layered = (): HeldWeaponArt => {
+    const art = placeholderWeapon('rivetDriver')
+    for (const v of VIEWS) {
+      const view = art[v]!
+      art[v] = {
+        ...view,
+        glow: [tex(17, 11, `rivetDriver.${v}-glow-0`)],
+        mods: {
+          frost: [tex(17, 11, `rivetDriver.${v}-mod-frost-0`)],
+          incendiary: [tex(17, 11, `rivetDriver.${v}-mod-incendiary-0`)],
+          explosive: [tex(17, 11, `rivetDriver.${v}-mod-explosive-0`)],
+        },
+      }
+    }
+    return art
+  }
+  const label = (sp: Sprite): string => sp.texture.label ?? ''
+  const modded = (mods: { id: string; stacks: number }[]): Entity => {
+    const e = holding('rivetDriver', 'player')
+    e.loadout = { inventory: [{ itemId: 'rivetDriver', qty: 1, mods }], activeSlot: 0 }
+    return e
+  }
+
+  it('unmodded: the weapon untinted, no accent, no attachments', () => {
+    const r = drawn(modded([]), rig({ rivetDriver: layered() }))
+    expect(held(r)).toHaveLength(1)
+    expect(held(r)[0].tint).toBe(0xffffff)
+    expect(sprites(r).filter((sp) => label(sp).includes('-glow-') || label(sp).includes('-mod-'))).toHaveLength(0)
+  })
+
+  it('modded: the accent takes the mod colour, the weapon keeps its own', () => {
+    const r = drawn(modded([{ id: 'frost', stacks: 1 }]), rig({ rivetDriver: layered() }))
+    const accent = sprites(r).find((sp) => label(sp).includes('-glow-'))!
+    expect(held(r)[0].tint).toBe(0xffffff)
+    expect(accent.tint).not.toBe(0xffffff)
+    // registered on the weapon's own grip and grid
+    expect(accent.position.x).toBe(held(r)[0].position.x)
+    expect(accent.position.y).toBe(held(r)[0].position.y)
+    expect(accent.anchor.x).toBe(held(r)[0].anchor.x)
+    expect(accent.zIndex).toBeGreaterThan(held(r)[0].zIndex)
+  })
+
+  it('attachments stack bottom-to-top in MOD_LAYER_ORDER whatever the pickup order', () => {
+    const r = drawn(
+      modded([
+        { id: 'incendiary', stacks: 1 },
+        { id: 'frost', stacks: 2 },
+        { id: 'explosive', stacks: 1 },
+        { id: 'pierce', stacks: 1 }, // no drawn layer: skipped
+      ]),
+      rig({ rivetDriver: layered() }),
+    )
+    const order = sprites(r)
+      .filter((sp) => label(sp).includes('-mod-'))
+      .sort((a, b) => a.zIndex - b.zIndex)
+      .map((sp) => label(sp).split('-mod-')[1].split('-')[0])
+    expect(order).toEqual(['explosive', 'frost', 'incendiary'])
+  })
+
+  it('a pack without a glow layer still tints the whole sprite (unchanged path)', () => {
+    const e = modded([{ id: 'frost', stacks: 1 }])
+    const r = drawn(e)
+    expect(held(r)[0].tint).not.toBe(0xffffff)
+  })
+
+  it('dropping the weapon drops every layer', () => {
+    const r = rig({ rivetDriver: layered() })
+    const e = modded([{ id: 'frost', stacks: 1 }, { id: 'explosive', stacks: 1 }])
+    r.views.update([e], 0, 100, 0)
+    e.combat = { weapon: 'fists', cooldown: 0 }
+    r.views.update([e], 0, 101, 0)
+    expect(sprites(r).filter((sp) => label(sp).includes('-glow-') || label(sp).includes('-mod-'))).toHaveLength(0)
+  })
+
+  it('beasts draw no weapon and no layers', () => {
+    const r = drawn(holding('fangs', 'gloamhound'), rig({ rivetDriver: layered() }))
     expect(sprites(r)).toHaveLength(1)
   })
 })

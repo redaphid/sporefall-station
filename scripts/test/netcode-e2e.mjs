@@ -78,12 +78,12 @@ const main = async () => {
   const avatar = () => host.world.byId.get(host.peersBySlot.get(slot)?.entityId)
   // Give the client's host-side avatar a known multi-weapon loadout to switch/use.
   avatar().playerCtl.inventory = [
-    { itemId: 'pistol', qty: 20 },
-    { itemId: 'freezeRay', qty: 6, mods: [{ id: 'frost', stacks: 2 }] },
+    { itemId: 'rivetDriver', qty: 20 },
+    { itemId: 'frostCondenser', qty: 6, mods: [{ id: 'frost', stacks: 2 }] },
     { itemId: 'bandage', qty: 3 },
   ]
   avatar().playerCtl.activeSlot = 0
-  avatar().combat.weapon = 'pistol'
+  avatar().combat.weapon = 'rivetDriver'
   await sleep(800)
 
   // (2) Movement reconciles: client walks right, host avatar's x should advance.
@@ -99,13 +99,13 @@ const main = async () => {
   await sleep(120)
   clientIn.set({})
   await sleep(500)
-  check('hotbar equip edge round-trips: host equipped slot 1 (freezeRay)', avatar().combat.weapon === 'freezeRay', `weapon=${avatar().combat.weapon}`)
-  check('hotbar equip reflected back to client', client.renderView().self?.combat?.weapon === 'freezeRay')
+  check('hotbar equip edge round-trips: host equipped slot 1 (freezeRay)', avatar().combat.weapon === 'frostCondenser', `weapon=${avatar().combat.weapon}`)
+  check('hotbar equip reflected back to client', client.renderView().self?.combat?.weapon === 'frostCondenser')
 
   // (5) Inventory (#57) sync: host spends freeze-ray ammo, client sees the drop.
   avatar().playerCtl.inventory[1].qty = 2
   await sleep(500)
-  const clientFreeze = client.renderView().self?.playerCtl?.inventory?.find((s) => s.itemId === 'freezeRay')
+  const clientFreeze = client.renderView().self?.playerCtl?.inventory?.find((s) => s.itemId === 'frostCondenser')
   check('inventory ammo change syncs host→client', clientFreeze?.qty === 2, `qty=${clientFreeze?.qty}`)
   check('per-weapon mods survive to the client', JSON.stringify(clientFreeze?.mods) === JSON.stringify([{ id: 'frost', stacks: 2 }]))
 

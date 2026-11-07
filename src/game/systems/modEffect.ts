@@ -161,7 +161,7 @@ const HIGHER_BETTER: Record<string, boolean> = {
   damage: true, cooldownTicks: false, knockback: true, pellets: true, spread: false, projectileSpeed: true,
 }
 const LABEL: Record<string, string> = {
-  damage: 'damage', cooldownTicks: 'fire rate', knockback: 'knockback', pellets: 'pellets', spread: 'accuracy', projectileSpeed: 'bullet speed',
+  damage: 'damage', cooldownTicks: 'fire rate', knockback: 'knockback', pellets: 'pellets', spread: 'accuracy', projectileSpeed: 'shot speed',
 }
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b)
@@ -183,7 +183,7 @@ export const modVerdict = (weapon: WeaponDef, mods: readonly WeaponMod[], modId:
   const [withIt, without] = shots
   if (same(withIt, without)) {
     if (rechargeHidesIt(weapon, installed, modId)) return { kind: 'inert', reason: 'recharge hides it' }
-    return { kind: 'inert', reason: weapon.kind === 'melee' ? 'no effect on melee' : 'no effect on this gun' }
+    return { kind: 'inert', reason: weapon.kind === 'melee' ? 'no effect on melee' : 'no effect on this weapon' }
   }
 
   const worse: string[] = []

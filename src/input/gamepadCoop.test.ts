@@ -276,7 +276,7 @@ describe('createGamepadCoop', () => {
       'button %i joins the pad and stays fully inert while held',
       (i) => {
         coop.update(
-          viewWith([{ playerId: 0, inventory: [{ itemId: 'pistol', qty: 5 }, { itemId: 'wrench', qty: 1 }], activeSlot: 0 }]),
+          viewWith([{ playerId: 0, inventory: [{ itemId: 'rivetDriver', qty: 5 }, { itemId: 'pressureLance', qty: 1 }], activeSlot: 0 }]),
         )
         pads = [pad(0, { buttons: press(i) })]
         const first = coop.sample()
@@ -397,7 +397,7 @@ describe('createGamepadCoop', () => {
         viewWith([
           {
             playerId: 0,
-            inventory: [{ itemId: 'pistol', qty: 1 }, { itemId: 'grenade', qty: 2 }, { itemId: 'molotov', qty: 1 }],
+            inventory: [{ itemId: 'rivetDriver', qty: 1 }, { itemId: 'grenade', qty: 2 }, { itemId: 'molotov', qty: 1 }],
             activeSlot: 1,
           },
         ]),
@@ -426,7 +426,7 @@ describe('createGamepadCoop', () => {
           viewWith([
             {
               playerId: 0,
-              inventory: [{ itemId: 'pistol', qty: 1 }, { itemId: 'grenade', qty: 2 }],
+              inventory: [{ itemId: 'rivetDriver', qty: 1 }, { itemId: 'grenade', qty: 2 }],
               activeSlot: 1,
             },
           ]),
@@ -452,7 +452,7 @@ describe('createGamepadCoop', () => {
     // Slot 0 is the permanent weapon: present in the inventory (mods live there)
     // but never a cycle destination. The held items are slots 1..3.
     const inv = [
-      { itemId: 'pistol', qty: 1 },
+      { itemId: 'rivetDriver', qty: 1 },
       { itemId: 'grenade', qty: 2 },
       { itemId: 'bandage', qty: 3 },
       { itemId: 'molotov', qty: 1 },
@@ -478,8 +478,8 @@ describe('createGamepadCoop', () => {
       }
     })
     it('returns -1 when the player carries nothing but their weapon', () => {
-      expect(cycleHotbar([{ itemId: 'pistol', qty: 1 }], 0, 1)).toBe(-1)
-      expect(cycleHotbar([{ itemId: 'pistol', qty: 1 }], 0, -1)).toBe(-1)
+      expect(cycleHotbar([{ itemId: 'rivetDriver', qty: 1 }], 0, 1)).toBe(-1)
+      expect(cycleHotbar([{ itemId: 'rivetDriver', qty: 1 }], 0, -1)).toBe(-1)
     })
     it('skips the non-equippable canister in display order', () => {
       const withCase = [{ itemId: 'canister', qty: 1 }, { itemId: 'grenade', qty: 1 }, { itemId: 'bandage', qty: 1 }]

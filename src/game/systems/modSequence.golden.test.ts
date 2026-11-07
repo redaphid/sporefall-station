@@ -69,9 +69,15 @@ describe('sequenced casting: golden digests', () => {
   // the cash terminal left the shopfloor. Both run on frozen landing maps (the
   // classic floor-1 grid, as authored state). Seed 7 equals main's; 1234 also
   // moves with the landing berth, which shifts where that floor's crew stands.
+  // Re-pinned by the lore weapons (was f0f577c1 / b5f38eca). Two parts, proven
+  // separately: (1) the id rename alone is pure: with drones still taking the
+  // arsenal roll, mapping the new ids in worldDigest back to the old ones
+  // (rivetDriver->pistol, ...) reproduces f0f577c1 and b5f38eca exactly; (2) the
+  // drone wardens now keep their grapple arms instead of a rolled weapon
+  // (NpcDef.bodyArmed), so the crowd around the fire path fights differently.
   const GOLDEN: Record<number, string> = {
-    7: 'f0f577c1',
-    1234: 'b5f38eca',
+    7: '1d12c12d',
+    1234: 'c65ecfe4',
   }
 
   for (const seed of [7, 1234]) {

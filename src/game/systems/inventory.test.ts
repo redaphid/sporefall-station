@@ -31,7 +31,7 @@ describe('inventory', () => {
     const slots: { itemId: string; qty: number }[] = []
     addItem(slots, 'grenade', 1)
     addItem(slots, 'grenade', 2)
-    addItem(slots, 'pistol', 8)
+    addItem(slots, 'rivetDriver', 8)
     expect(slots).toHaveLength(2)
     expect(slots.find((s) => s.itemId === 'grenade')!.qty).toBe(3)
   })
@@ -45,8 +45,8 @@ describe('inventory', () => {
   it('a weapon slot can NEVER be equipped — the weapon is permanent', () => {
     const e = player(w)
     e.loadout!.inventory = [
-      { itemId: 'wrench', qty: 12 },
-      { itemId: 'pistol', qty: 1 },
+      { itemId: 'pressureLance', qty: 12 },
+      { itemId: 'rivetDriver', qty: 1 },
     ]
     expect(equipSlot(e, 0)).toBe(false)
     expect(equipSlot(e, 1)).toBe(false)
@@ -56,16 +56,16 @@ describe('inventory', () => {
 
   it('equipping a throwable holds it without touching the swung weapon', () => {
     const e = player(w)
-    arm(e, 'wrench')
+    arm(e, 'pressureLance')
     e.loadout!.inventory.push({ itemId: 'grenade', qty: 2 })
     expect(equipSlot(e, 1)).toBe(true)
     expect(e.loadout!.activeSlot).toBe(1)
-    expect(e.combat!.weapon).toBe('wrench')
+    expect(e.combat!.weapon).toBe('pressureLance')
   })
 
   it("a PLAYER's melee weapon never wears out — it is the only one they get", () => {
     const e = player(w)
-    arm(e, 'knife')
+    arm(e, 'siphonSpike')
     const stack = e.loadout!.inventory[0]
     stack.qty = 2
     for (let i = 0; i < 5; i++) {
@@ -73,15 +73,15 @@ describe('inventory', () => {
       combatSystem(w, attack())
     }
     expect(e.loadout!.inventory).toHaveLength(1)
-    expect(e.combat!.weapon).toBe('knife')
+    expect(e.combat!.weapon).toBe('siphonSpike')
     expect(stack.qty).toBe(2) // untouched: no durability is spent
   })
 
   it("an NPC's melee weapon still breaks when its durability runs out", () => {
     // Enemy gear is unchanged — only the PLAYER's weapon is permanent.
     const npc = addEntity(w, makeEntity('npc', 'mutant', 20, 20))
-    npc.combat = { weapon: 'knife', cooldown: 0 }
-    npc.loadout = { inventory: [{ itemId: 'knife', qty: 2 }], activeSlot: 0 }
+    npc.combat = { weapon: 'siphonSpike', cooldown: 0 }
+    npc.loadout = { inventory: [{ itemId: 'siphonSpike', qty: 2 }], activeSlot: 0 }
     wearMelee(npc)
     expect(npc.loadout.inventory[0].qty).toBe(1)
     wearMelee(npc)

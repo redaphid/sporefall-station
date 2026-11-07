@@ -1912,13 +1912,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "siphonSpike",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "siphonSpike",
             "qty": 20
           }
         ],
@@ -1975,13 +1975,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "stunGun",
+        "weapon": "sparkCoil",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "stunGun",
+            "itemId": "sparkCoil",
             "qty": 1
           }
         ],
@@ -2046,13 +2046,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "rivetDriver",
             "qty": 1
           }
         ],
@@ -2109,13 +2109,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -2172,13 +2172,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "siphonSpike",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "siphonSpike",
             "qty": 20
           }
         ],
@@ -2234,13 +2234,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "machinegun",
+        "weapon": "coilRepeater",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "machinegun",
+            "itemId": "coilRepeater",
             "qty": 1,
             "mods": [
               {
@@ -2303,13 +2303,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -2374,13 +2374,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "shotgun",
+        "weapon": "scatterFunnel",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "shotgun",
+            "itemId": "scatterFunnel",
             "qty": 1
           }
         ],
@@ -2437,13 +2437,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "shotgun",
+        "weapon": "scatterFunnel",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "shotgun",
+            "itemId": "scatterFunnel",
             "qty": 1
           }
         ],
@@ -2500,13 +2500,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "siphonSpike",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "siphonSpike",
             "qty": 20
           }
         ],
@@ -2563,13 +2563,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "siphonSpike",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "siphonSpike",
             "qty": 20
           }
         ],
@@ -2625,13 +2625,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "rivetDriver",
             "qty": 1
           }
         ],
@@ -2687,13 +2687,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "freezeRay",
+        "weapon": "frostCondenser",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "freezeRay",
+            "itemId": "frostCondenser",
             "qty": 1
           }
         ],
@@ -2749,13 +2749,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "machinegun",
+        "weapon": "coilRepeater",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "machinegun",
+            "itemId": "coilRepeater",
             "qty": 1
           }
         ],
@@ -2811,13 +2811,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "shotgun",
+        "weapon": "scatterFunnel",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "shotgun",
+            "itemId": "scatterFunnel",
             "qty": 1
           }
         ],
@@ -2873,13 +2873,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "siphonSpike",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "siphonSpike",
             "qty": 20
           }
         ],
@@ -2935,13 +2935,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "flamethrower",
+        "weapon": "phosphorHose",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "flamethrower",
+            "itemId": "phosphorHose",
             "qty": 1
           }
         ],
@@ -2997,13 +2997,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "flamethrower",
+        "weapon": "phosphorHose",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "flamethrower",
+            "itemId": "phosphorHose",
             "qty": 1
           }
         ],
@@ -3059,13 +3059,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "siphonSpike",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "siphonSpike",
             "qty": 20
           }
         ],
@@ -3122,13 +3122,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "rivetDriver",
             "qty": 1
           }
         ],
@@ -3185,13 +3185,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -3248,13 +3248,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "stunGun",
+        "weapon": "sparkCoil",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "stunGun",
+            "itemId": "sparkCoil",
             "qty": 1
           }
         ],
@@ -3310,13 +3310,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "flamethrower",
+        "weapon": "phosphorHose",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "flamethrower",
+            "itemId": "phosphorHose",
             "qty": 1,
             "mods": [
               {
@@ -3379,13 +3379,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "rivetDriver",
             "qty": 1,
             "mods": [
               {
@@ -3444,13 +3444,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -3503,13 +3503,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -3575,13 +3575,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -3647,13 +3647,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "flamethrower",
+        "weapon": "phosphorHose",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "flamethrower",
+            "itemId": "phosphorHose",
             "qty": 1
           }
         ],
@@ -3719,13 +3719,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -12449,13 +12449,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -12517,13 +12517,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -12585,13 +12585,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -12653,13 +12653,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -12721,13 +12721,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -15319,7 +15319,7 @@
         "iframes": 90
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "status": {
@@ -15331,7 +15331,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "rivetDriver",
             "qty": 1
           }
         ],

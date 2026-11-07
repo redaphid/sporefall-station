@@ -32,7 +32,7 @@ const bullets = (w: World): Entity[] => w.entities.filter((e) => e.kind === 'pro
 describe('NPC loadout: a modded enemy folds its mods into its shots', () => {
   it('an explosive-modded NPC gun spawns a projectile that carries the mod AND the explode behavior', () => {
     const w = createWorld(1, 1)
-    const npc = moddedNpc(w, 20, 20, 'pistol', [{ id: 'explosive', stacks: 1 }])
+    const npc = moddedNpc(w, 20, 20, 'rivetDriver', [{ id: 'explosive', stacks: 1 }])
     expect(fireWeapon(w, npc)).toBe(true)
     const [b] = bullets(w)
     // Provenance: the normalized mod list rides the bullet (renderer/wire read it).
@@ -44,7 +44,7 @@ describe('NPC loadout: a modded enemy folds its mods into its shots', () => {
 
   it('an explosive NPC bullet actually DETONATES on a body — modded behavior, not just provenance', () => {
     const w = createWorld(1, 1)
-    const npc = moddedNpc(w, 20, 20, 'pistol', [{ id: 'explosive', stacks: 1 }])
+    const npc = moddedNpc(w, 20, 20, 'rivetDriver', [{ id: 'explosive', stacks: 1 }])
     // A victim two tiles downrange (east), out of the blast of the muzzle.
     const victim = addEntity(w, makeEntity('npc', 'mutant', 22, 20))
     victim.health = { hp: 40, max: 40, iframes: 0 }
@@ -56,7 +56,7 @@ describe('NPC loadout: a modded enemy folds its mods into its shots', () => {
 
   it('a pierce-modded NPC gun spawns a projectile that carries pierce (mod + pierceLeft)', () => {
     const w = createWorld(1, 1)
-    const npc = moddedNpc(w, 20, 20, 'pistol', [{ id: 'pierce', stacks: 1 }])
+    const npc = moddedNpc(w, 20, 20, 'rivetDriver', [{ id: 'pierce', stacks: 1 }])
     fireWeapon(w, npc)
     const [b] = bullets(w)
     expect(b.projectile!.mods).toEqual([{ id: 'pierce', stacks: 1 }])
@@ -67,10 +67,10 @@ describe('NPC loadout: a modded enemy folds its mods into its shots', () => {
     const w = createWorld(1, 1)
     const mods: WeaponMod[] = [{ id: 'pierce', stacks: 2 }, { id: 'explosive', stacks: 1 }]
     const p = spawnPlayer(w, 0, 20, 20)
-    p.combat!.weapon = 'pistol'
-    p.loadout = npcLoadout('pistol', mods) // same shared component the NPC uses
+    p.combat!.weapon = 'rivetDriver'
+    p.loadout = npcLoadout('rivetDriver', mods) // same shared component the NPC uses
     p.facing = 0
-    const npc = moddedNpc(w, 40, 20, 'pistol', mods)
+    const npc = moddedNpc(w, 40, 20, 'rivetDriver', mods)
     fireWeapon(w, p)
     fireWeapon(w, npc)
     const [pb, nb] = bullets(w)
@@ -84,7 +84,7 @@ describe('NPC loadout: degenerate + round-trip', () => {
   it('a loadout-less NPC fires innately vanilla — no stack, no mods (the pre-feature default)', () => {
     const w = createWorld(1, 1)
     const npc = addEntity(w, makeEntity('npc', 'mutant', 20, 20))
-    npc.combat = { weapon: 'pistol', cooldown: 0 }
+    npc.combat = { weapon: 'rivetDriver', cooldown: 0 }
     npc.health = { hp: 40, max: 40, iframes: 0 }
     expect(npc.loadout).toBeUndefined()
     expect(weaponStack(npc)).toBeUndefined()
@@ -100,12 +100,12 @@ describe('NPC loadout: degenerate + round-trip', () => {
     expect(civ.combat!.weapon).toBe('fists')
     expect(civ.loadout).toBeUndefined()
     const wrench = spawnNpc(w, 'mutant', 21, 21) // mutant wields a wrench (durable melee → slotted)
-    expect(wrench.loadout).toEqual({ inventory: [{ itemId: 'wrench', qty: 16 }], activeSlot: 0 })
+    expect(wrench.loadout).toEqual({ inventory: [{ itemId: 'pressureLance', qty: 16 }], activeSlot: 0 })
   })
 
   it("serialize→deserialize round-trips an NPC's loadout + weapon mods byte-for-byte", () => {
     const w = createWorld(7, 2)
-    const npc = moddedNpc(w, 15, 15, 'shotgun', [
+    const npc = moddedNpc(w, 15, 15, 'scatterFunnel', [
       { id: 'pierce', stacks: 2 },
       { id: 'frost', stacks: 1 },
     ])
@@ -143,6 +143,6 @@ describe('modded-enemy spawns are deterministic', () => {
     const modded = w.entities.filter((e) => e.kind === 'npc' && e.loadout?.inventory[0]?.mods?.length)
     expect(modded.length).toBeGreaterThan(0)
     // Every enemy mod folds onto a RANGED weapon (a projectile is where it reads).
-    for (const e of modded) expect(['pistol', 'shotgun', 'machinegun', 'freezeRay', 'flamethrower', 'stunGun']).toContain(e.combat!.weapon)
+    for (const e of modded) expect(['rivetDriver', 'scatterFunnel', 'coilRepeater', 'frostCondenser', 'phosphorHose', 'sparkCoil']).toContain(e.combat!.weapon)
   })
 })

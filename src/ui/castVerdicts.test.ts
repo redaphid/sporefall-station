@@ -29,7 +29,7 @@ const shoot = (): Map<number, InputCmd> => new Map([[0, { ...emptyInput(), attac
 const rig = (mods?: WeaponMod[]): World => {
   const w = createWorld(1, 1)
   const p = spawnPlayer(w, 0, 20.5, 20.5)
-  p.loadout!.inventory = [{ itemId: 'pistol', qty: 99, ...(mods ? { mods } : {}) }]
+  p.loadout!.inventory = [{ itemId: 'rivetDriver', qty: 99, ...(mods ? { mods } : {}) }]
   equipSlot(p, 0)
   p.facing = 0
   return deserializeWorld(serializeWorld(w))
@@ -62,7 +62,7 @@ const pickupCard = (w: World, modId: string): string | undefined =>
   buildInfoCard(dropMod(w, modId, 30.5, 30.5), { self: player(w) }).rows.find((r) => r.label === 'On your weapon')?.value
 
 const draftVerdict = (w: World, modId: string): ModVerdict | undefined =>
-  draftCards([modId], { weapon: WEAPONS.pistol, mods: weaponStack(player(w))?.mods ?? [] })[0].verdict
+  draftCards([modId], { weapon: WEAPONS.rivetDriver, mods: weaponStack(player(w))?.mods ?? [] })[0].verdict
 
 /** The element each of `n` trigger pulls put on its bullets, waiting out the
  * cooldown (and any wrap recharge) between pulls. */

@@ -5,7 +5,7 @@
 // nearest-neighbour. One PNG per pose: rows are archetypes, columns facings.
 //
 //   BASE_URL=http://localhost:4891 node e2e/weapon-zoom-sheet.mjs OUT_DIR \
-//     [--theme swampspace-hires] [--weapons PACK_DIR] [--label after] [--cast armed|loot|beasts]
+//     [--theme swampspace-hires] [--weapons PACK_DIR] [--label after] [--cast armed|loot|beasts|modded]
 //
 // --weapons PACK_DIR test-drives weapon art that is not in the pack yet: the
 // page's theme manifest is patched in flight to map every
@@ -69,6 +69,15 @@ const CASTS = {
     ['lockkeeper', 'fists'],
     ['hivespire', 'fists'],
   ],
+  // The Rivet Driver under each mod it draws an attachment for: the
+  // attachments and the coloured essence accent, on a player and a drowner.
+  modded: [
+    ['player', 'rivetDriver', [{ id: 'frost', stacks: 2 }]],
+    ['player', 'rivetDriver', [{ id: 'incendiary', stacks: 2 }]],
+    ['player', 'rivetDriver', [{ id: 'shock', stacks: 2 }]],
+    ['player', 'rivetDriver', [{ id: 'explosive', stacks: 2 }]],
+    ['drowner', 'rivetDriver', [{ id: 'explosive', stacks: 1 }, { id: 'frost', stacks: 1 }, { id: 'incendiary', stacks: 1 }]],
+  ],
 }
 const CAST = CASTS[flag('cast', 'armed')]
 const FACINGS = [
@@ -90,7 +99,7 @@ const stage = () => {
   p.health.hp = p.health.max
   const cells = []
   let id = w.nextId
-  CAST.forEach(([arch, weapon], row) =>
+  CAST.forEach(([arch, weapon, mods], row) =>
     FACINGS.forEach(([dir, facing], col) => {
       const x = 7.5 + col * 2
       const y = 4.4 + row * 2.05
@@ -108,6 +117,7 @@ const stage = () => {
         facing,
         health: { hp: 30, max: 30, iframes: 0 },
         combat: { weapon, cooldown: 0 },
+        ...(mods ? { loadout: { inventory: [{ itemId: weapon, qty: 1, mods }], activeSlot: 0 } } : {}),
         status: { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 },
         ai: { mode: 'idle', faction: 'civ', home: { x, y }, thinkAt: 1e9, sightRange: 1 },
       })

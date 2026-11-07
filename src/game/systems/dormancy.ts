@@ -42,7 +42,7 @@ const wakeTrigger = (w: World, e: Entity, stimuli: ReturnType<typeof gatherStimu
   const kinds = e.ai!.wakeOn
   if (!kinds || kinds.length === 0) return undefined
   if (kinds.includes('power-cut') && anyPowerCut(w)) return 'power-cut'
-  if (kinds.includes('proximity') && bodyNear(w, e, WAKE_PROXIMITY_RANGE)) return 'proximity'
+  if (kinds.includes('proximity') && bodyNear(w, e, e.ai!.wakeRange ?? WAKE_PROXIMITY_RANGE)) return 'proximity'
   if (
     kinds.includes('damage') &&
     e.health?.lastHurtTick !== undefined &&
@@ -71,9 +71,19 @@ export const awakeningSystem = (w: World): void => {
     stimuli ??= gatherStimuli(w) // built once, only if there's a sleeper to check
     const by = wakeTrigger(w, e, stimuli)
     if (!by) continue
-    e.ai.dormant = false
-    e.ai.mode = 'aggro'
-    e.ai.thinkAt = w.tick // think (and act) this very tick
-    w.events.push({ type: 'woke', entityId: e.id, by })
+    rouse(w, e, by)
+    // An authored ambush springs as one: the rest of the cell wakes with it.
+    const cell = e.ai.wakeCell
+    if (cell === undefined) continue
+    for (const o of w.entities) {
+      if (o !== e && !o.dead && o.ai?.dormant && o.ai.wakeCell === cell) rouse(w, o, 'cell')
+    }
   }
+}
+
+const rouse = (w: World, e: Entity, by: string): void => {
+  e.ai!.dormant = false
+  e.ai!.mode = 'aggro'
+  e.ai!.thinkAt = w.tick // think (and act) this very tick
+  w.events.push({ type: 'woke', entityId: e.id, by })
 }

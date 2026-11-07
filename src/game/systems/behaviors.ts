@@ -169,7 +169,7 @@ const isHostileTarget = (w: World, e: Entity, target: Entity): boolean => {
     // Derelict Units (robots) sleep through a peaceful station, but a power cut
     // wakes them into open hostility — the standing cost of the power-cut path.
     return (
-      w.hostile ||
+      (w.hostile && !ai.peaceful) ||
       dispositionToward(e, target.id) === 'Hostile' ||
       (ai.faction === 'warden' && w.alarm >= 2) ||
       (!!ai.wakeOn?.includes('power-cut') && anyPowerCut(w))

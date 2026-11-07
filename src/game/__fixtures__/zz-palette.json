@@ -1,0 +1,1765 @@
+{
+  "v": 1,
+  "seed": 1,
+  "floor": 1,
+  "tick": 0,
+  "nextId": 39,
+  "alarm": 0,
+  "gameOver": false,
+  "mission": {
+    "template": "reach",
+    "complete": true,
+    "exitUnlocked": true,
+    "description": "Reach the Launch Bay"
+  },
+  "noises": [],
+  "events": [],
+  "rng": 1092533862,
+  "baseRng": 1,
+  "level": {
+    "rows": [
+      "##############################################",
+      "#....++++====%%%%xxxx~~~~,,,,----::::HHHH#####",
+      "#....++++====%%%%xxxx~~~~,,,,----::::HHHH#####",
+      "#....++++====%%%%xxxx~~~~,,,,----::::HHHH#####",
+      "#....++++====%%%%xxxx~~~~,,,,----::::HHHH#####",
+      "#....++++====%%%%xxxx~~~~,,,,----::::HHHH#####",
+      "#....++++====%%%%xxxx~~~~,,,,----::::HHHH#####",
+      "#....++++====%%%%xxxx~~~~,,,,----::::HHHH#####",
+      "#....++++====%%%%xxxx~~~~,,,,----::::HHHH#####",
+      "#....++++====%%%%xxxx~~~~,,,,----::::HHHH#####",
+      "#....++++====%%%%xxxx~~~~,,,,----::::HHHH#####",
+      "#............................................#",
+      "#............................................#",
+      "#............................................#",
+      "#............................................#",
+      "#............................................#",
+      "#............................................#",
+      "#............................................#",
+      "#............................................#",
+      "#............................................#",
+      "#............................................#",
+      "#............................................#",
+      "#............................................#",
+      "##############################################"
+    ],
+    "spawn": {
+      "x": 5.5,
+      "y": 15.5
+    },
+    "exit": {
+      "x": -1,
+      "y": -1
+    }
+  },
+  "entities": [
+    {
+      "id": 1,
+      "kind": "player",
+      "archetype": "player",
+      "pos": {
+        "x": 5.5,
+        "y": 15.5
+      },
+      "prevPos": {
+        "x": 5.5,
+        "y": 15.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.5,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 120,
+        "max": 120,
+        "iframes": 90
+      },
+      "combat": {
+        "weapon": "rivetDriver",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "rivetDriver",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
+      "playerCtl": {
+        "playerId": 0,
+        "abilityCooldown": 0,
+        "cash": 0,
+        "misdeedUntilTick": 0
+      }
+    },
+    {
+      "id": 2,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 2.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 2.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 3,
+      "kind": "interactable",
+      "archetype": "barrel",
+      "pos": {
+        "x": 6.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 6.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 15,
+        "max": 15,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 4,
+      "kind": "interactable",
+      "archetype": "tv",
+      "pos": {
+        "x": 10.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 10.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 12,
+        "max": 12,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 5,
+      "kind": "interactable",
+      "archetype": "toilet",
+      "pos": {
+        "x": 14.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 14.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 6,
+      "kind": "interactable",
+      "archetype": "vending",
+      "pos": {
+        "x": 18.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 18.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 40,
+        "max": 40,
+        "iframes": 0
+      },
+      "interact": {
+        "verb": "use",
+        "range": 1.3
+      }
+    },
+    {
+      "id": 7,
+      "kind": "interactable",
+      "archetype": "generator",
+      "pos": {
+        "x": 22.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 22.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 30,
+        "max": 30,
+        "iframes": 0
+      },
+      "interact": {
+        "verb": "use",
+        "range": 1.3
+      }
+    },
+    {
+      "id": 8,
+      "kind": "interactable",
+      "archetype": "cryoTerminal",
+      "pos": {
+        "x": 26.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 26.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 30,
+        "max": 30,
+        "iframes": 0
+      },
+      "interact": {
+        "verb": "use",
+        "range": 1.3
+      }
+    },
+    {
+      "id": 9,
+      "kind": "interactable",
+      "archetype": "sporeNode",
+      "pos": {
+        "x": 30.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 30.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 45,
+        "max": 45,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 10,
+      "kind": "interactable",
+      "archetype": "barricade",
+      "pos": {
+        "x": 34.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 34.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 40,
+        "max": 40,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 11,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 2.5,
+        "y": 15.5
+      },
+      "prevPos": {
+        "x": 2.5,
+        "y": 15.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 12,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 6.5,
+        "y": 15.5
+      },
+      "prevPos": {
+        "x": 6.5,
+        "y": 15.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 13,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 10.5,
+        "y": 15.5
+      },
+      "prevPos": {
+        "x": 10.5,
+        "y": 15.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 14,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 14.5,
+        "y": 15.5
+      },
+      "prevPos": {
+        "x": 14.5,
+        "y": 15.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 15,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 18.5,
+        "y": 15.5
+      },
+      "prevPos": {
+        "x": 18.5,
+        "y": 15.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 16,
+      "kind": "interactable",
+      "archetype": "locker",
+      "pos": {
+        "x": 22.5,
+        "y": 15.5
+      },
+      "prevPos": {
+        "x": 22.5,
+        "y": 15.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 30,
+        "max": 30,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 17,
+      "kind": "interactable",
+      "archetype": "table",
+      "pos": {
+        "x": 26.5,
+        "y": 15.5
+      },
+      "prevPos": {
+        "x": 26.5,
+        "y": 15.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 16,
+        "max": 16,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 18,
+      "kind": "interactable",
+      "archetype": "chair",
+      "pos": {
+        "x": 30.5,
+        "y": 15.5
+      },
+      "prevPos": {
+        "x": 30.5,
+        "y": 15.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 19,
+      "kind": "interactable",
+      "archetype": "plant",
+      "pos": {
+        "x": 34.5,
+        "y": 15.5
+      },
+      "prevPos": {
+        "x": 34.5,
+        "y": 15.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 20,
+      "kind": "npc",
+      "archetype": "drowner",
+      "pos": {
+        "x": 2.5,
+        "y": 19.5
+      },
+      "prevPos": {
+        "x": 2.5,
+        "y": 19.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 38,
+        "max": 38,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "rivetDriver",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "rivetDriver",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "poisoned": 0.7,
+        "spore": 0.5
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "rootcult",
+        "home": {
+          "x": 2.5,
+          "y": 19.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "raider",
+        "dormant": true
+      }
+    },
+    {
+      "id": 21,
+      "kind": "npc",
+      "archetype": "mutant",
+      "pos": {
+        "x": 6.5,
+        "y": 19.5
+      },
+      "prevPos": {
+        "x": 6.5,
+        "y": 19.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 40,
+        "max": 40,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "pressureLance",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "pressureLance",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "rootcult",
+        "home": {
+          "x": 6.5,
+          "y": 19.5
+        },
+        "thinkAt": 0,
+        "sightRange": 7,
+        "dormant": true
+      }
+    },
+    {
+      "id": 22,
+      "kind": "npc",
+      "archetype": "acolyte",
+      "pos": {
+        "x": 10.5,
+        "y": 19.5
+      },
+      "prevPos": {
+        "x": 10.5,
+        "y": 19.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.6,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 35,
+        "max": 35,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "rivetDriver",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "rivetDriver",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "rootcult",
+        "home": {
+          "x": 10.5,
+          "y": 19.5
+        },
+        "thinkAt": 0,
+        "sightRange": 8,
+        "behavior": "hunter",
+        "dormant": true
+      }
+    },
+    {
+      "id": 23,
+      "kind": "npc",
+      "archetype": "brute",
+      "pos": {
+        "x": 14.5,
+        "y": 19.5
+      },
+      "prevPos": {
+        "x": 14.5,
+        "y": 19.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 2.5,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 95,
+        "max": 95,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "horns",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "horns",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "physical": 0.35,
+        "burning": 1.5,
+        "poisoned": 1
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "rootcult",
+        "home": {
+          "x": 14.5,
+          "y": 19.5
+        },
+        "thinkAt": 0,
+        "sightRange": 8,
+        "behavior": "hunter",
+        "dormant": true
+      }
+    },
+    {
+      "id": 24,
+      "kind": "npc",
+      "archetype": "lobber",
+      "pos": {
+        "x": 18.5,
+        "y": 19.5
+      },
+      "prevPos": {
+        "x": 18.5,
+        "y": 19.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 2.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 58,
+        "max": 58,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "spore": 0,
+        "poisoned": 0.5,
+        "burning": 1.3
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "rootcult",
+        "home": {
+          "x": 18.5,
+          "y": 19.5
+        },
+        "thinkAt": 0,
+        "sightRange": 11,
+        "behavior": "mortar",
+        "dormant": true
+      }
+    },
+    {
+      "id": 25,
+      "kind": "npc",
+      "archetype": "gloamhound",
+      "pos": {
+        "x": 22.5,
+        "y": 19.5
+      },
+      "prevPos": {
+        "x": 22.5,
+        "y": 19.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.2,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 32,
+        "max": 32,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fangs",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "fangs",
+            "qty": 20
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "spore": 0,
+        "poisoned": 0.6
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "neutral",
+        "home": {
+          "x": 22.5,
+          "y": 19.5
+        },
+        "thinkAt": 0,
+        "sightRange": 10,
+        "behavior": "hound",
+        "dormant": true
+      }
+    },
+    {
+      "id": 26,
+      "kind": "npc",
+      "archetype": "hivespire",
+      "pos": {
+        "x": 26.5,
+        "y": 19.5
+      },
+      "prevPos": {
+        "x": 26.5,
+        "y": 19.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 120,
+        "max": 120,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "physical": 0.7,
+        "burning": 1.6,
+        "spore": 0,
+        "poisoned": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "neutral",
+        "home": {
+          "x": 26.5,
+          "y": 19.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "hive",
+        "dormant": true
+      }
+    },
+    {
+      "id": 27,
+      "kind": "npc",
+      "archetype": "pod",
+      "pos": {
+        "x": 30.5,
+        "y": 19.5
+      },
+      "prevPos": {
+        "x": 30.5,
+        "y": 19.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 26,
+        "max": 26,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "spore": 0,
+        "poisoned": 0.3,
+        "burning": 1.4
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "neutral",
+        "home": {
+          "x": 30.5,
+          "y": 19.5
+        },
+        "thinkAt": 0,
+        "sightRange": 8,
+        "behavior": "vermin",
+        "dormant": true,
+        "wakeOn": [
+          "noise",
+          "proximity",
+          "damage",
+          "fire"
+        ]
+      }
+    },
+    {
+      "id": 28,
+      "kind": "npc",
+      "archetype": "lurker",
+      "pos": {
+        "x": 34.5,
+        "y": 19.5
+      },
+      "prevPos": {
+        "x": 34.5,
+        "y": 19.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.6,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 28,
+        "max": 28,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "mandibles",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "mandibles",
+            "qty": 20
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "spore": 0,
+        "poisoned": 0.5
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "rootcult",
+        "home": {
+          "x": 34.5,
+          "y": 19.5
+        },
+        "thinkAt": 0,
+        "sightRange": 8,
+        "behavior": "lurker",
+        "dormant": true,
+        "wakeOn": [
+          "proximity",
+          "damage",
+          "door"
+        ]
+      }
+    },
+    {
+      "id": 29,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 2.5,
+        "y": 21.5
+      },
+      "prevPos": {
+        "x": 2.5,
+        "y": 21.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "rootcult",
+        "home": {
+          "x": 2.5,
+          "y": 21.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "vermin",
+        "dormant": true
+      }
+    },
+    {
+      "id": 30,
+      "kind": "npc",
+      "archetype": "robot",
+      "pos": {
+        "x": 6.5,
+        "y": 21.5
+      },
+      "prevPos": {
+        "x": 6.5,
+        "y": 21.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 2.6,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 70,
+        "max": 70,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "physical": 0.4,
+        "burning": 1.5,
+        "poisoned": 0,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "neutral",
+        "home": {
+          "x": 6.5,
+          "y": 21.5
+        },
+        "thinkAt": 0,
+        "sightRange": 7,
+        "wakeOn": [
+          "power-cut"
+        ],
+        "dormant": true
+      }
+    },
+    {
+      "id": 31,
+      "kind": "npc",
+      "archetype": "shopkeeper",
+      "pos": {
+        "x": 10.5,
+        "y": 21.5
+      },
+      "prevPos": {
+        "x": 10.5,
+        "y": 21.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.2,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 45,
+        "max": 45,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "pressureLance",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "pressureLance",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "civ",
+        "home": {
+          "x": 10.5,
+          "y": 21.5
+        },
+        "thinkAt": 0,
+        "sightRange": 6,
+        "dormant": true
+      }
+    },
+    {
+      "id": 32,
+      "kind": "npc",
+      "archetype": "mender",
+      "pos": {
+        "x": 14.5,
+        "y": 21.5
+      },
+      "prevPos": {
+        "x": 14.5,
+        "y": 21.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.3,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 44,
+        "max": 44,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "poisoned": 0.2,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "rootcult",
+        "home": {
+          "x": 14.5,
+          "y": 21.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "mender",
+        "dormant": true
+      }
+    },
+    {
+      "id": 33,
+      "kind": "npc",
+      "archetype": "bellwether",
+      "pos": {
+        "x": 18.5,
+        "y": 21.5
+      },
+      "prevPos": {
+        "x": 18.5,
+        "y": 21.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 90,
+        "max": 90,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "rivetDriver",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "rivetDriver",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "physical": 0.8,
+        "burning": 1.2
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "rootcult",
+        "home": {
+          "x": 18.5,
+          "y": 21.5
+        },
+        "thinkAt": 0,
+        "sightRange": 10,
+        "behavior": "raider",
+        "dormant": true
+      }
+    },
+    {
+      "id": 34,
+      "kind": "npc",
+      "archetype": "breacher",
+      "pos": {
+        "x": 22.5,
+        "y": 21.5
+      },
+      "prevPos": {
+        "x": 22.5,
+        "y": 21.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 62,
+        "max": 62,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "pressureLance",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "pressureLance",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "physical": 0.85,
+        "burning": 1.4
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "rootcult",
+        "home": {
+          "x": 22.5,
+          "y": 21.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "raider",
+        "dormant": true
+      }
+    },
+    {
+      "id": 35,
+      "kind": "npc",
+      "archetype": "stalker",
+      "pos": {
+        "x": 26.5,
+        "y": 21.5
+      },
+      "prevPos": {
+        "x": 26.5,
+        "y": 21.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.2,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 30,
+        "max": 30,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fangs",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "fangs",
+            "qty": 20
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "poisoned": 0.4,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "neutral",
+        "home": {
+          "x": 26.5,
+          "y": 21.5
+        },
+        "thinkAt": 0,
+        "sightRange": 10,
+        "behavior": "predator",
+        "dormant": true
+      }
+    },
+    {
+      "id": 36,
+      "kind": "npc",
+      "archetype": "cinder",
+      "pos": {
+        "x": 30.5,
+        "y": 21.5
+      },
+      "prevPos": {
+        "x": 30.5,
+        "y": 21.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 45,
+        "max": 45,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "physical": 1.1,
+        "burning": 0.2
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "rootcult",
+        "home": {
+          "x": 30.5,
+          "y": 21.5
+        },
+        "thinkAt": 0,
+        "sightRange": 8,
+        "behavior": "hunter",
+        "dormant": true
+      }
+    },
+    {
+      "id": 37,
+      "kind": "npc",
+      "archetype": "scientist",
+      "pos": {
+        "x": 34.5,
+        "y": 21.5
+      },
+      "prevPos": {
+        "x": 34.5,
+        "y": 21.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 30,
+        "max": 30,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "civ",
+        "home": {
+          "x": 34.5,
+          "y": 21.5
+        },
+        "thinkAt": 0,
+        "sightRange": 6,
+        "behavior": "skittish",
+        "dormant": true
+      }
+    },
+    {
+      "id": 38,
+      "kind": "fire",
+      "archetype": "spore",
+      "pos": {
+        "x": 40.5,
+        "y": 15.5
+      },
+      "prevPos": {
+        "x": 40.5,
+        "y": 15.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "spore": {
+        "fuel": 240
+      }
+    }
+  ],
+  "hostile": false
+}

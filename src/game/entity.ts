@@ -127,6 +127,19 @@ export interface AiState {
    * 'noise' | 'spore' | 'fire' | 'proximity' | 'power-cut' | 'damage'. The
    * data-row that replaces the hardcoded `archetype === 'robot'` special case. */
   wakeOn?: string[]
+  /** Authored ambushes: how close (tiles) a foreign body must come to trip a
+   * `'proximity'` sleeper. Absent = dormancy's WAKE_PROXIMITY_RANGE. A crafted
+   * world sets it so an encounter wakes as the player walks into its room,
+   * rather than when they brush past one body. */
+  wakeRange?: number
+  /** Authored ambushes: an encounter label. When any dormant body of a cell
+   * wakes, every dormant body sharing the label wakes the same tick (`woke` by
+   * `'cell'`), so the whole room springs at once. */
+  wakeCell?: string
+  /** Ignores the world's blanket hostility toward players (`World.hostile`):
+   * a peaceful body turns on a player only by a stored grudge, which a player's
+   * landed blow records. The burrow folk of a crafted world are the use. */
+  peaceful?: boolean
   /** #77 — the station module this NPC BELONGS to: index into `level.buildings`
    * plus that building's role, stamped at spawn by populate. Drives the
    * territorial goals (work its room, garrison/defend the objective wing).

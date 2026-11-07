@@ -8,7 +8,7 @@ import { addEntity, emitFear, emitNoise, type World } from '../world'
 import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
 import { groupDamageMult } from './groupFx'
 import { equipSlot, useHeld, wearMelee, weaponStack } from './inventory'
-import { commitMisdeed } from './relationships'
+import { addHate, commitMisdeed, MISDEED_HATE } from './relationships'
 import { hearGunfire, seeAttackOnPlayer } from './alarm'
 import { destroyObject, isObject, resistsDamage } from './objects'
 import { resolveWeapon, type CarriedElements, type ResolvedWeapon } from './resolveWeapon'
@@ -197,6 +197,14 @@ export const applyDamage = (
   // Disposition: a player attack on a civ/warden is a misdeed — witnesses re-derive
   // their stance toward the attacker (wardens/allies turn hostile, civilians flee).
   commitMisdeed(w, target, w.byId.get(attackerId))
+  // A peaceful body (World.hostile does not reach it) holds a grudge against
+  // the player who struck it, and turns on them.
+  if (target.ai?.peaceful && !target.dead && w.byId.get(attackerId)?.playerCtl) {
+    addHate(target, attackerId, MISDEED_HATE)
+    target.ai.mode = 'aggro'
+    target.ai.targetId = attackerId
+    target.ai.thinkAt = w.tick
+  }
 
   if (target.health.hp <= 0) {
     // The ice gib fires when the SHATTERING BLOW is the one that kills — not on

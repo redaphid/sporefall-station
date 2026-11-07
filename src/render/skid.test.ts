@@ -171,7 +171,7 @@ describe('stops that must NOT skid', () => {
     runStop(1, 0, { x: 33.5, run: 60, n: 80 }),
   )
   noSkid('a stop into an attack stops without one: the swing carries the momentum', () =>
-    runStop(1, 0, { setup: (p) => void arm(p, 'pistol'), after: (k) => (k < 6 ? { attack: true, aimX: 1, aimY: 0 } : STILL) }),
+    runStop(1, 0, { setup: (p) => void arm(p, 'rivetDriver'), after: (k) => (k < 6 ? { attack: true, aimX: 1, aimY: 0 } : STILL) }),
   )
   noSkid('a stop into a roll stops without one, and so does the end of the roll', () =>
     runStop(1, 0, { after: (k) => (k === 0 ? { roll: true, aimX: 1 } : STILL), n: 70 }),
@@ -226,7 +226,7 @@ describe('priorities: what cuts a skid, and how', () => {
 
   it('an attack mid-skid cuts it the same way, and the attack plays as it would have', () => {
     const make = (): ReturnType<typeof runStop> =>
-      runStop(1, 0, { setup: (p) => void arm(p, 'pistol'), after: (k) => (k >= 3 && k < 6 ? { attack: true, aimX: 1, aimY: 0 } : STILL) })
+      runStop(1, 0, { setup: (p) => void arm(p, 'rivetDriver'), after: (k) => (k >= 3 && k < 6 ? { attack: true, aimX: 1, aimY: 0 } : STILL) })
     const s = make()
     const on = framesOf(s, ON)
     const off = framesOf(make(), OFF)
@@ -547,7 +547,7 @@ describe('the held weapon and the gun-hand stops', () => {
   }
 
   it('the held weapon goes with the lean, around the feet, hand and all (pixel art: never rotated)', () => {
-    const make = (): ReturnType<typeof runStop> => runStop(1, 0, { setup: (p) => void arm(p, 'pistol') })
+    const make = (): ReturnType<typeof runStop> => runStop(1, 0, { setup: (p) => void arm(p, 'rivetDriver') })
     const s = make()
     const on = framesOf(s, ON, armedArt())
     const off = framesOf(make(), OFF, armedArt())
@@ -565,14 +565,14 @@ describe('the held weapon and the gun-hand stops', () => {
     // Pinned above too ("a stop into an attack"); here with the aim held, the
     // way a player shoots the moment they let go of the stick.
     const make = (): ReturnType<typeof runStop> =>
-      runStop(1, 0, { setup: (p) => void arm(p, 'pistol'), after: (k) => (k < 4 ? { attack: true, aimX: 1, aimY: 0 } : STILL) })
+      runStop(1, 0, { setup: (p) => void arm(p, 'rivetDriver'), after: (k) => (k < 4 ? { attack: true, aimX: 1, aimY: 0 } : STILL) })
     expect(diffTicks(framesOf(make(), ON), framesOf(make(), OFF))).toEqual([])
   })
 
   it('aim-walk: strafing east while aiming north, then letting go, leans against the RUN (sideways to the gun), the gun with it', () => {
     // A sidestep stop tips the body sideways, whatever it faces; the gun stays
     // in the hand and keeps pointing north, turned only by the lean.
-    const make = (): ReturnType<typeof runStop> => runStop(1, 0, { setup: (p) => void arm(p, 'pistol'), aim: [0, -1] })
+    const make = (): ReturnType<typeof runStop> => runStop(1, 0, { setup: (p) => void arm(p, 'rivetDriver'), aim: [0, -1] })
     const s = make()
     const on = framesOf(s, ON, armedArt())
     const off = framesOf(make(), OFF, armedArt())

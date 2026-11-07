@@ -31,7 +31,7 @@ const mkPlayer = (over: Partial<PlayerSnap> = {}): PlayerSnap => ({
   hp: 30,
   maxHp: 30,
   cash: 0,
-  weapon: 'pistol',
+  weapon: 'rivetDriver',
   mods: [],
   status: [],
   downed: false,
@@ -288,8 +288,8 @@ describe('bossHalf', () => {
 describe('build timeline', () => {
   it('records mod pickups in order and tracks peak stacks from samples', () => {
     const s = primed()
-    applyEvent(s, { type: 'modPickup', tick: 120, entityId: 1, byId: 7, modId: 'homing', weapon: 'pistol', maxed: false }, 1_001_000)
-    applyEvent(s, { type: 'modPickup', tick: 180, entityId: 2, byId: 7, modId: 'frost', weapon: 'pistol', maxed: false }, 1_002_000)
+    applyEvent(s, { type: 'modPickup', tick: 120, entityId: 1, byId: 7, modId: 'homing', weapon: 'rivetDriver', maxed: false }, 1_001_000)
+    applyEvent(s, { type: 'modPickup', tick: 180, entityId: 2, byId: 7, modId: 'frost', weapon: 'rivetDriver', maxed: false }, 1_002_000)
     applySample(s, mkSample({ tick: 200, wallMs: 1_003_000, players: [mkPlayer({ mods: [{ id: 'homing', stacks: 2 }, { id: 'frost', stacks: 1 }] })] }))
     expect(s.run?.modPickups.map((m) => m.modId)).toEqual(['homing', 'frost'])
     expect(s.run?.peakModStacks).toBe(3)
@@ -297,8 +297,8 @@ describe('build timeline', () => {
 
   it('weapon changes and cash movement land in the run record', () => {
     const s = primed()
-    applySample(s, mkSample({ tick: 200, wallMs: 1_002_000, players: [mkPlayer({ weapon: 'shotgun', cash: 40 })] }))
-    expect(s.run?.weaponChanges).toEqual([{ tick: 200, playerId: 0, from: 'pistol', to: 'shotgun' }])
+    applySample(s, mkSample({ tick: 200, wallMs: 1_002_000, players: [mkPlayer({ weapon: 'scatterFunnel', cash: 40 })] }))
+    expect(s.run?.weaponChanges).toEqual([{ tick: 200, playerId: 0, from: 'rivetDriver', to: 'scatterFunnel' }])
     expect(s.run?.cashLog.at(-1)).toEqual({ tick: 200, cash: 40 })
   })
 
@@ -317,9 +317,9 @@ describe('extractSample', () => {
   const stateJson = { tick: 500, seed: 42, floor: 2, alarm: 1, gameOver: false, mission: { template: 'steal', description: 'x', complete: false, exitUnlocked: false } }
   const playerEnt = {
     id: 7, kind: 'player', archetype: 'player', pos: { x: 10.123, y: 11.987 }, vel: { x: 0.5, y: 0 }, intent: { x: 1, y: 0 },
-    health: { hp: 22, max: 30 }, combat: { weapon: 'pistol', cooldown: 0 },
+    health: { hp: 22, max: 30 }, combat: { weapon: 'rivetDriver', cooldown: 0 },
     playerCtl: { playerId: 0, abilityCooldown: 0, cash: 55, misdeedUntilTick: 0 },
-    loadout: { inventory: [{ itemId: 'pistol', qty: 60, mods: [{ id: 'homing', stacks: 2 }] }], activeSlot: 0 },
+    loadout: { inventory: [{ itemId: 'rivetDriver', qty: 60, mods: [{ id: 'homing', stacks: 2 }] }], activeSlot: 0 },
     fx: { burning: { until: 600 } },
   }
   const nearNpc = { id: 41, kind: 'npc', archetype: 'brute', pos: { x: 14, y: 11 }, health: { hp: 18, max: 26 }, ai: { mode: 'aggro', goal: 'battle', faction: 'rootcult' } }

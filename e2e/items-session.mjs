@@ -117,7 +117,7 @@ const main = async () => {
   // SHOTGUN ⇒ spread of pellets. Sample fast right after firing and grab the
   // peak count / a frame with the fan mid-flight (pellets are small and quick).
   await ready(page, 'items')
-  await equip(page, 'shotgun')
+  await equip(page, 'scatterFunnel')
   await page.keyboard.press('Space')
   let peak = 0
   for (let i = 0; i < 10; i++) {

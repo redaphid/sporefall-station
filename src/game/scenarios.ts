@@ -204,12 +204,12 @@ const setupInventory = (w: World): void => {
     player.prevPos = { x: player.pos.x, y: player.pos.y }
     player.facing = 0 // aim east, down the row into view
     player.loadout!.inventory = [
-      { itemId: 'wrench', qty: WEAPONS.wrench.durability! },
-      { itemId: 'pistol', qty: 3 },
+      { itemId: 'pressureLance', qty: WEAPONS.pressureLance.durability! },
+      { itemId: 'rivetDriver', qty: 3 },
       { itemId: 'grenade', qty: 2 },
     ]
     player.loadout!.activeSlot = 0
-    if (player.combat) player.combat.weapon = 'wrench'
+    if (player.combat) player.combat.weapon = 'pressureLance'
   }
   crate(w, x + 4, y)
   crate(w, x + 5, y)
@@ -228,12 +228,12 @@ const setupItems = (w: World): void => {
     player.prevPos = { x: player.pos.x, y: player.pos.y }
     player.facing = 0 // aim east, down the row into view
     player.loadout!.inventory = [
-      { itemId: 'shotgun', qty: 6 },
+      { itemId: 'scatterFunnel', qty: 6 },
       { itemId: 'grenade', qty: 2 },
-      { itemId: 'sledgehammer', qty: WEAPONS.sledgehammer.durability! },
+      { itemId: 'cageRam', qty: WEAPONS.cageRam.durability! },
     ]
     player.loadout!.activeSlot = 0
-    if (player.combat) player.combat.weapon = 'shotgun'
+    if (player.combat) player.combat.weapon = 'scatterFunnel'
   }
   bystander(w, x + 4, y)
   crate(w, x + 7, y)
@@ -316,8 +316,8 @@ const setupShowcase = (w: World): void => {
     // Showcase only: tanky so the demo can wander through fire/booms and survive.
     if (player.health) player.health = { hp: 500, max: 500, iframes: 0 }
   }
-  const gun = makeEntity('pickup', 'pickup.pistol', x + 4 + 0.5, y + 0.5, 0.3)
-  gun.pickup = { itemId: 'pistol', qty: 1 }
+  const gun = makeEntity('pickup', 'pickup.rivetDriver', x + 4 + 0.5, y + 0.5, 0.3)
+  gun.pickup = { itemId: 'rivetDriver', qty: 1 }
   addEntity(w, gun)
 
   // Grenades on OPEN ground at the east end (not on a crate — a grenade spawned
@@ -549,14 +549,14 @@ const setupNpcCombat = (w: World): void => {
   }
 
   const ring: [string, string][] = [
-    ['mutant', 'wrench'],
-    ['mutant', 'knife'],
-    ['acolyte', 'pistol'],
-    ['acolyte', 'shotgun'],
-    ['acolyte', 'machinegun'],
-    ['mutant', 'sledgehammer'],
-    ['acolyte', 'tranquilizer'],
-    ['acolyte', 'flamethrower'],
+    ['mutant', 'pressureLance'],
+    ['mutant', 'siphonSpike'],
+    ['acolyte', 'rivetDriver'],
+    ['acolyte', 'scatterFunnel'],
+    ['acolyte', 'coilRepeater'],
+    ['mutant', 'cageRam'],
+    ['acolyte', 'lullDarter'],
+    ['acolyte', 'phosphorHose'],
   ]
   const radius = 6
   for (let i = 0; i < ring.length; i++) {
@@ -615,7 +615,7 @@ const setupNpcAi = (w: World): void => {
 
   // Hunter: sees far, holds a grudge, carries a wrench (a chase, not a shootout).
   const hunter = spawnNpc(w, 'acolyte', cx + 8.5, cy + 0.5)
-  hunter.combat!.weapon = 'wrench'
+  hunter.combat!.weapon = 'pressureLance'
   hunter.ai!.sightRange = 14
   if (player) hunter.ai!.rel = { [player.id]: { hate: 40, code: 'Hostile' } }
 
@@ -703,7 +703,7 @@ const setupNpcDeliberate = (w: World): void => {
     solidify(cx - 5, y) // east face x=27
   }
   const hunter = spawnNpc(w, 'acolyte', cx - 8 + 0.5, cy - 5 + 0.5) // (24.5, 27.5)
-  hunter.combat!.weapon = 'wrench'
+  hunter.combat!.weapon = 'pressureLance'
   hunter.ai!.sightRange = 14
   if (player) {
     hunter.ai!.rel = { [player.id]: { hate: 40, code: 'Hostile' } }
@@ -721,7 +721,7 @@ const setupNpcDeliberate = (w: World): void => {
   addEntity(w, door)
   const squaddie = (x: number, y: number, role: 'lead' | 'flank' | 'rear'): Entity => {
     const e = spawnNpc(w, 'mutant', x, y)
-    e.combat!.weapon = 'wrench'
+    e.combat!.weapon = 'pressureLance'
     e.ai!.behavior = 'squad'
     e.ai!.squad = { id: 1, role }
     e.ai!.sightRange = 12
@@ -767,9 +767,9 @@ const stageArtCompare = (w: World): void => {
     player.pos = { x: 8 + 0.5, y: LANE_Y + 0.5 }
     player.prevPos = { x: player.pos.x, y: player.pos.y }
     player.facing = Math.PI / 2 // idle facing south (toward camera)
-    player.loadout!.inventory = [{ itemId: 'wrench', qty: 1 }]
+    player.loadout!.inventory = [{ itemId: 'pressureLance', qty: 1 }]
     player.loadout!.activeSlot = 0
-    if (player.combat) player.combat.weapon = 'wrench'
+    if (player.combat) player.combat.weapon = 'pressureLance'
   }
   stageMutant(w, 18, LANE_Y)
   stageMutant(w, 19, LANE_Y)
@@ -962,7 +962,7 @@ const setupArmed = (w: World, floor = ARMED_DEFAULT_FLOOR): void => {
   player.loadout = {
     inventory: [
       {
-        itemId: 'machinegun',
+        itemId: 'coilRepeater',
         qty: 1,
         mods: [
           { id: 'heavy', stacks: 2 },
@@ -976,7 +976,7 @@ const setupArmed = (w: World, floor = ARMED_DEFAULT_FLOOR): void => {
     ],
     activeSlot: 1, // grenades held on the Use/Throw button; the gun fires regardless
   }
-  if (player.combat) player.combat.weapon = 'machinegun'
+  if (player.combat) player.combat.weapon = 'coilRepeater'
 }
 
 /** `?scenario=stairs-demo[&floor=N]`: the `armed` kit on floor N (default 3),

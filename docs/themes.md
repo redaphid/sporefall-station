@@ -391,6 +391,15 @@ procedural stand-in.
   the camera. A melee weapon with no `attack` frames chops by stepping through
   the views (overhead, over, strike, follow-through).
 
+- **Layers (optional).** `weapon.<id>.<view>-glow-<n>` is the weapon's
+  essence accent alone, in pale ink, on the same canvas as the view's frames.
+  With it, the renderer leaves the weapon's own colours alone and colours and
+  pulses only this layer from the weapon's mods (`composeWeaponSkin`); without
+  it the whole sprite is tinted, as before. `weapon.<id>.<view>-mod-<modId>-<n>`
+  is a generated attachment one mod adds (frost fins, an igniter, a Tesla
+  coil, a canister drum), drawn over the weapon when it carries that mod, in
+  `MOD_LAYER_ORDER` (`src/render/sprites.ts`). Both loop on the idle clock.
+
 ## Fallback semantics (exact)
 
 For each sprite key, resolution walks a **theme chain**: `[active theme, settlement]`

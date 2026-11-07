@@ -16,7 +16,7 @@ describe('player hp over the snapshot codec after a lifesteal heal', () => {
     const w = createWorld(1, 1)
     const host = spawnPlayer(w, 0, 20, 20)
     host.health = { hp: 100, max: 240, iframes: 0 }
-    arm(host, 'pistol').mods = [{ id: 'lifesteal', stacks: 2 }]
+    arm(host, 'rivetDriver').mods = [{ id: 'lifesteal', stacks: 2 }]
     const foe = addEntity(w, makeEntity('npc', 'civilian', 22, 20))
     foe.health = { hp: 10000, max: 10000, iframes: 0 }
 

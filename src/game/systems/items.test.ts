@@ -76,16 +76,16 @@ describe('item breadth', () => {
   describe('ranged weapons', () => {
     it('a shotgun fires its full spread of pellets in one shot, at varied angles', () => {
       const e = player(w)
-      arm(e, 'shotgun')
+      arm(e, 'scatterFunnel')
       combatSystem(w, attack())
       const pellets = w.entities.filter((x) => x.projectile)
-      expect(pellets).toHaveLength(WEAPONS.shotgun.pellets!)
+      expect(pellets).toHaveLength(WEAPONS.scatterFunnel.pellets!)
       expect(new Set(pellets.map((p) => p.facing)).size).toBeGreaterThan(1)
     })
 
     it('a freeze ray freezes the target it hits', () => {
       const e = player(w)
-      arm(e, 'freezeRay')
+      arm(e, 'frostCondenser')
       const target = dummy(w, 22, 20)
       combatSystem(w, attack())
       for (let t = 0; t < 30 && !hasStatus(target, 'frozen'); t++) projectileSystem(w)
@@ -94,7 +94,7 @@ describe('item breadth', () => {
 
     it('a tranquilizer puts the target to sleep', () => {
       const e = player(w)
-      arm(e, 'tranquilizer')
+      arm(e, 'lullDarter')
       const target = dummy(w, 22, 20)
       combatSystem(w, attack())
       for (let t = 0; t < 30 && target.status!.sleep === 0; t++) projectileSystem(w)
@@ -105,7 +105,7 @@ describe('item breadth', () => {
   describe('melee onHit', () => {
     it('a sledgehammer stuns what it hits', () => {
       const e = player(w)
-      arm(e, 'sledgehammer')
+      arm(e, 'cageRam')
       const target = dummy(w, 21, 20)
       combatSystem(w, attack())
       expect(target.status!.stun).toBeGreaterThan(0)

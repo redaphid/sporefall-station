@@ -86,9 +86,9 @@ describe('buildInfoCard — every NPC archetype in the game gets a full card', (
 describe('buildInfoCard — the weapon an NPC is carrying', () => {
   const weaponRow = (e: Entity): string | undefined => rowMap(buildInfoCard(e).rows).Weapon
 
-  it('an armed NPC names its weapon — a mutant swings a Wrench, an acolyte a Pistol', () => {
-    expect(weaponRow(spawnNpc(world(), 'mutant', 5, 5))).toBe('Wrench')
-    expect(weaponRow(spawnNpc(world(), 'acolyte', 5, 5))).toBe('Pistol')
+  it('an armed NPC names its weapon — a mutant swings a Pressure Lance, an acolyte a Rivet Driver', () => {
+    expect(weaponRow(spawnNpc(world(), 'mutant', 5, 5))).toBe('Pressure Lance')
+    expect(weaponRow(spawnNpc(world(), 'acolyte', 5, 5))).toBe('Rivet Driver')
   })
 
   it('a fists-only NPC reads as "Unarmed", not the "Fists" item name', () => {
@@ -109,11 +109,11 @@ describe('buildInfoCard — the weapon an NPC is carrying', () => {
     // NPC weapons are vanilla today, but the mod readout keys off the equipped
     // stack, not `playerCtl` — so any carrier's build shows. Proven via a player.
     const p = spawnPlayer(world(), 0, 2, 2)
-    p.combat!.weapon = 'sledgehammer'
-    p.loadout!.inventory.push({ itemId: 'sledgehammer', qty: 1, mods: [{ id: 'frost', stacks: 1 }] })
+    p.combat!.weapon = 'cageRam'
+    p.loadout!.inventory.push({ itemId: 'cageRam', qty: 1, mods: [{ id: 'frost', stacks: 1 }] })
     p.loadout!.activeSlot = p.loadout!.inventory.length - 1
     const rows = rowMap(buildInfoCard(p).rows)
-    expect(rows.Weapon).toBe('Sledgehammer')
+    expect(rows.Weapon).toBe('Cage Ram')
     expect(rows['❄️ Cryo Rounds']).toBe('×1')
   })
 
@@ -174,15 +174,15 @@ describe('buildInfoCard — players', () => {
   it('reads slot, cash, weapon and the modded build', () => {
     const w = world()
     const p = spawnPlayer(w, 0, 2, 2)
-    p.combat!.weapon = 'shotgun'
-    p.loadout!.inventory.push({ itemId: 'shotgun', qty: 6, mods: [{ id: 'frost', stacks: 1 }, { id: 'bounce', stacks: 2 }] })
+    p.combat!.weapon = 'scatterFunnel'
+    p.loadout!.inventory.push({ itemId: 'scatterFunnel', qty: 6, mods: [{ id: 'frost', stacks: 1 }, { id: 'bounce', stacks: 2 }] })
     p.loadout!.activeSlot = p.loadout!.inventory.length - 1
     p.playerCtl!.cash = 120
     const card = buildInfoCard(p)
     const rows = rowMap(card.rows)
     expect(rows.Player).toBe('P1')
     expect(rows.Scrip).toBe('120')
-    expect(rows.Weapon).toBe('Shotgun')
+    expect(rows.Weapon).toBe('Scatter Funnel')
     expect(rows['❄️ Cryo Rounds']).toBe('×1')
     expect(rows['🪃 Bouncy']).toBe('×2')
   })
@@ -190,8 +190,8 @@ describe('buildInfoCard — players', () => {
   it('a vanilla gun shows no mod rows', () => {
     const w = world()
     const p = spawnPlayer(w, 0, 2, 2)
-    p.combat!.weapon = 'pistol'
-    p.loadout!.inventory.push({ itemId: 'pistol', qty: 6 })
+    p.combat!.weapon = 'rivetDriver'
+    p.loadout!.inventory.push({ itemId: 'rivetDriver', qty: 6 })
     p.loadout!.activeSlot = p.loadout!.inventory.length - 1
     expect(buildInfoCard(p).rows.some((r) => r.value.startsWith('×'))).toBe(false)
   })

@@ -179,8 +179,8 @@ describe('the real stun gun on a wet player', () => {
   const stunGunner = (w: World, x: number, y: number): Entity => {
     const gunner = spawnNpc(w, 'acolyte', x, y)
     gunner.health = { hp: 100000, max: 100000, iframes: 0 }
-    gunner.combat!.weapon = 'stunGun'
-    gunner.loadout = npcLoadout('stunGun')
+    gunner.combat!.weapon = 'sparkCoil'
+    gunner.loadout = npcLoadout('sparkCoil')
     return gunner
   }
 

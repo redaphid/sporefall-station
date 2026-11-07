@@ -23,7 +23,7 @@ const m = (id: string, stacks = 1): WeaponMod => ({ id, stacks })
 
 const armed = (w: World, mods?: WeaponMod[]): Entity => {
   const p = spawnPlayer(w, 0, 20, 20)
-  p.loadout!.inventory = [{ itemId: 'pistol', qty: 99, ...(mods ? { mods } : {}) }]
+  p.loadout!.inventory = [{ itemId: 'rivetDriver', qty: 99, ...(mods ? { mods } : {}) }]
   equipSlot(p, 0)
   p.facing = 0
   return p

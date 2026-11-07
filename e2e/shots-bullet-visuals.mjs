@@ -18,8 +18,8 @@ const base = JSON.parse(readFileSync(join(__dirname, '../src/game/__fixtures__/c
 const armed = (mods) => {
   const w = JSON.parse(JSON.stringify(base))
   const p = w.entities.find((e) => e.playerCtl)
-  p.combat.weapon = 'machinegun'
-  p.playerCtl.inventory = [{ itemId: 'machinegun', qty: 99, ...(mods ? { mods } : {}) }]
+  p.combat.weapon = 'coilRepeater'
+  p.playerCtl.inventory = [{ itemId: 'coilRepeater', qty: 99, ...(mods ? { mods } : {}) }]
   p.playerCtl.activeSlot = 0
   return w
 }

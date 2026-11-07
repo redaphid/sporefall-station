@@ -27,7 +27,7 @@ const isElement = (id: string): boolean => MODS[id]?.onHit !== undefined
 /** A gun facing east, its next cast starting at window position `at`.
  * Seed 1 floor 1 has an open corridor over y 18..22, x 14..36: every stage
  * below stays inside it, so no wall stops a round, shard or blast. */
-const rig = (mods: string[], at = 0, weapon = 'pistol'): { w: World; p: Entity } => {
+const rig = (mods: string[], at = 0, weapon = 'rivetDriver'): { w: World; p: Entity } => {
   const w = createWorld(1, 1)
   const p = spawnPlayer(w, 0, 20, 20)
   p.loadout!.inventory = []
@@ -68,7 +68,7 @@ const fire = (w: World, ticks = 20): SimEvent[] => {
 }
 
 /** Pull once and stop the moment the round dies, so its children are fresh. */
-const children = (mods: string[], at = 0, weapon = 'pistol'): { round: Entity; shards: Entity[]; frags: Entity[] } => {
+const children = (mods: string[], at = 0, weapon = 'rivetDriver'): { round: Entity; shards: Entity[]; frags: Entity[] } => {
   const { w } = rig(mods, at, weapon)
   body(w, 24, 20, 1)
   combatSystem(w, new Map([[0, { ...emptyInput(), attack: true }]]))
@@ -94,11 +94,11 @@ const blasts = (events: SimEvent[]): Extract<SimEvent, { type: 'explosion' }>[] 
 describe("shards and shrapnel carry the element that ends their round's cast", () => {
   it('the owner\'s example: bouncy, bouncy, fire, splinter, ice shoots "bouncy bouncy fire", then "splinter ice"', () => {
     const list = ['bounce', 'bounce', 'incendiary', 'splinterShot', 'frost']
-    const first = children(list, 0, 'machinegun')
+    const first = children(list, 0, 'coilRepeater')
     expect(first.round.projectile!.onHit?.status).toBe('burning')
     expect(first.round.projectile!.mods).toEqual([m('bounce', 2), m('incendiary')])
     expect(first.frags).toEqual([])
-    const second = children(list, 3, 'machinegun')
+    const second = children(list, 3, 'coilRepeater')
     expect(second.round.projectile!.onHit?.status).toBe('frozen')
     expect(second.frags).toHaveLength(4)
     for (const f of second.frags) {
@@ -156,7 +156,7 @@ describe("shards and shrapnel carry the element that ends their round's cast", (
   })
 
   it("a base weapon's own element is not a payload: a freeze ray's bare split cast freezes, its shards do not", () => {
-    const { round, shards } = children(['split'], 0, 'freezeRay')
+    const { round, shards } = children(['split'], 0, 'frostCondenser')
     expect(round.projectile!.onHit?.status).toBe('frozen')
     expect(shards).toHaveLength(2)
     for (const s of shards) expect(s.projectile!.onHit).toBeUndefined()
@@ -215,7 +215,7 @@ describe("blasts carry the element that ends their round's cast", () => {
   })
 
   it("a freeze ray's bare explosive cast: the blast only damages", () => {
-    const { w } = rig(['explosive'], 0, 'freezeRay')
+    const { w } = rig(['explosive'], 0, 'frostCondenser')
     const { pack } = stage(w)
     const [blast] = blasts(fire(w))
     expect(blast.element).toBeUndefined()
@@ -285,7 +285,7 @@ describe('determinism', () => {
     new Map([[0, { ...emptyInput(), seq: t, attack: t % 3 !== 0, aimX: 1, aimY: Math.sin(t * 0.3) * 0.4 }]])
 
   const fight = (): World => {
-    const { w } = rig(FIGHT, 0, 'shotgun')
+    const { w } = rig(FIGHT, 0, 'scatterFunnel')
     stage(w)
     for (let i = 0; i < 6; i++) body(w, 22 + i * 0.9, 18 + (i % 3) * 2, 60)
     return w

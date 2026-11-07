@@ -332,7 +332,7 @@ describe('JSON cold path — hostile payloads', () => {
       [MsgType.Go, { startTick: 90, entityIds: { 0: 1, 1: 2 } }],
       [MsgType.Events, { tick: 7, events: [{ type: 'hit', x: 1, y: 2, targetId: 3, amount: 4 }] }],
       [MsgType.State, { floor: 2, missionText: 'Escape', missionComplete: false, gameOver: false, alarm: 1, huds: {} }],
-      [MsgType.Inventory, { slot: 1, inventory: [{ itemId: 'pistol', qty: 6 }], activeSlot: 0, weapon: 'pistol' }],
+      [MsgType.Inventory, { slot: 1, inventory: [{ itemId: 'rivetDriver', qty: 6 }], activeSlot: 0, weapon: 'rivetDriver' }],
     ]
     for (const [type, payload] of cases) {
       const bytes = encodeJson(type, payload)

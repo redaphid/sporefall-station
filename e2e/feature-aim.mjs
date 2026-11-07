@@ -23,7 +23,7 @@ const stage = () => {
   p.prevPos = { x: CX, y: CY }
   p.facing = Math.PI / 2
   p.health = { hp: 1e6, max: 1e6, iframes: 0 }
-  p.combat = { weapon: 'pistol', cooldown: 0 }
+  p.combat = { weapon: 'rivetDriver', cooldown: 0 }
   w.entities = [p]
   return w
 }

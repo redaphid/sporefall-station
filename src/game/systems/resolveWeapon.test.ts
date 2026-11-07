@@ -4,9 +4,9 @@ import { MODS } from '../data/mods'
 import type { WeaponMod } from '../entity'
 import { resolveWeapon } from './resolveWeapon'
 
-const pistol = WEAPONS.pistol
-const shotgun = WEAPONS.shotgun
-const mg = WEAPONS.machinegun
+const pistol = WEAPONS.rivetDriver
+const shotgun = WEAPONS.scatterFunnel
+const mg = WEAPONS.coilRepeater
 
 describe('resolveWeapon — vanilla passthrough', () => {
   it('no mods → base stats, no behaviors, no triggers', () => {
@@ -113,8 +113,8 @@ describe('resolveWeapon — order independence (the key invariant)', () => {
     expect(resolveWeapon(pistol, [{ id: 'pierce', stacks: 1 }, { id: 'overload', stacks: 1 }, { id: 'shock', stacks: 1 }])).toEqual(cast)
   })
   it("a cast with no element keeps the base weapon's; one with an element replaces it", () => {
-    expect(resolveWeapon(WEAPONS.freezeRay, [{ id: 'overload', stacks: 1 }]).onHit).toEqual(WEAPONS.freezeRay.onHit)
-    expect(resolveWeapon(WEAPONS.sledgehammer, [{ id: 'frost', stacks: 1 }]).onHit).toEqual({ status: 'frozen', ticks: 120 })
+    expect(resolveWeapon(WEAPONS.frostCondenser, [{ id: 'overload', stacks: 1 }]).onHit).toEqual(WEAPONS.frostCondenser.onHit)
+    expect(resolveWeapon(WEAPONS.cageRam, [{ id: 'frost', stacks: 1 }]).onHit).toEqual({ status: 'frozen', ticks: 120 })
   })
 })
 

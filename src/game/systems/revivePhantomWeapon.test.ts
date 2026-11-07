@@ -48,9 +48,9 @@ describe('revive leaves the player with a real, slotted, moddable weapon', () =>
   it('normal revive: the phantom weapon is gone — weaponStack is defined and combat.weapon matches its slot', () => {
     const p = spawnPlayer(w, 0, 20, 20)
     // Simulate a player who had swapped to a found gun before going down.
-    p.loadout!.inventory = [{ itemId: 'shotgun', qty: 6 }]
+    p.loadout!.inventory = [{ itemId: 'scatterFunnel', qty: 6 }]
     p.loadout!.activeSlot = 0
-    p.combat!.weapon = 'shotgun'
+    p.combat!.weapon = 'scatterFunnel'
 
     downAndRevive(w, p)
 
@@ -61,30 +61,30 @@ describe('revive leaves the player with a real, slotted, moddable weapon', () =>
     expect(p.combat!.weapon).toBe(stack!.itemId) // combat.weapon is consistent
     expect(p.loadout!.activeSlot).toBeGreaterThanOrEqual(0)
     // Starter pistol comes back fully loaded (moddable slot, carries mods).
-    expect(p.loadout!.inventory).toEqual([{ itemId: 'pistol', qty: 1 }])
+    expect(p.loadout!.inventory).toEqual([{ itemId: 'rivetDriver', qty: 1 }])
   })
 
   it('normal revive KEEPS key items and re-slots the starter ahead of them', () => {
     const p = spawnPlayer(w, 0, 20, 20)
-    p.loadout!.inventory = [{ itemId: 'shotgun', qty: 6 }, { itemId: 'keycard.red', qty: 1 }]
+    p.loadout!.inventory = [{ itemId: 'scatterFunnel', qty: 6 }, { itemId: 'keycard.red', qty: 1 }]
     p.loadout!.activeSlot = 0
-    p.combat!.weapon = 'shotgun'
+    p.combat!.weapon = 'scatterFunnel'
 
     downAndRevive(w, p)
 
     expect(p.loadout!.inventory).toEqual([
-      { itemId: 'pistol', qty: 1 },
+      { itemId: 'rivetDriver', qty: 1 },
       { itemId: 'keycard.red', qty: 1 },
     ])
-    expect(weaponStack(p)!.itemId).toBe('pistol') // activeSlot 0 still resolves the gun
-    expect(p.combat!.weapon).toBe('pistol')
+    expect(weaponStack(p)!.itemId).toBe('rivetDriver') // activeSlot 0 still resolves the gun
+    expect(p.combat!.weapon).toBe('rivetDriver')
   })
 
   it('a REVIVED player who walks over a mod pickup actually receives the mod', () => {
     const p = spawnPlayer(w, 0, 20, 20)
-    p.loadout!.inventory = [{ itemId: 'shotgun', qty: 6 }]
+    p.loadout!.inventory = [{ itemId: 'scatterFunnel', qty: 6 }]
     p.loadout!.activeSlot = 0
-    p.combat!.weapon = 'shotgun'
+    p.combat!.weapon = 'scatterFunnel'
     downAndRevive(w, p)
 
     const pick = dropMod(w, 'frost', p)
@@ -99,15 +99,15 @@ describe('revive leaves the player with a real, slotted, moddable weapon', () =>
   it('casual revive: no strip, and the held weapon stays consistent (no phantom introduced)', () => {
     const cw = createWorld(1, 1, 'casual')
     const p = spawnPlayer(cw, 0, 20, 20)
-    p.loadout!.inventory = [{ itemId: 'shotgun', qty: 6 }]
+    p.loadout!.inventory = [{ itemId: 'scatterFunnel', qty: 6 }]
     p.loadout!.activeSlot = 0
-    p.combat!.weapon = 'shotgun'
+    p.combat!.weapon = 'scatterFunnel'
 
     downAndRevive(cw, p)
 
     // Casual keeps everything; the weapon is still really slotted (not a phantom).
-    expect(p.loadout!.inventory).toEqual([{ itemId: 'shotgun', qty: 6 }])
-    expect(weaponStack(p)!.itemId).toBe('shotgun')
+    expect(p.loadout!.inventory).toEqual([{ itemId: 'scatterFunnel', qty: 6 }])
+    expect(weaponStack(p)!.itemId).toBe('scatterFunnel')
     // And a mod still applies after a casual revive.
     dropMod(cw, 'homing', p)
     tickWorld(cw, new Map([[0, emptyInput()]]))
@@ -133,28 +133,28 @@ describe('applyModPickup — phantom-weapon materialization (defense in depth)',
 
   it('a phantom RANGED weapon (combat.weapon set, empty inventory) is slotted, then modded', () => {
     const p = bareEntity()
-    p.combat!.weapon = 'machinegun' // legacy-save phantom: named but unslotted
+    p.combat!.weapon = 'coilRepeater' // legacy-save phantom: named but unslotted
     const res = applyModPickup(p, 'bounce')
-    expect(res).toMatchObject({ modId: 'bounce', weapon: 'machinegun' })
+    expect(res).toMatchObject({ modId: 'bounce', weapon: 'coilRepeater' })
     const stack = weaponStack(p)
     expect(stack).toBeDefined()
-    expect(stack!.itemId).toBe('machinegun')
+    expect(stack!.itemId).toBe('coilRepeater')
     expect(stack!.qty).toBe(1) // no ammo: a gun materializes at a flat 1, as a home for mods
     // Slotted but NOT equipped: a weapon slot is never selectable (the weapon is
     // permanent), so activeSlot stays the held-item cursor. What matters is that
     // `weaponStack` reaches the slot, which is where the mod lands.
     expect(p.loadout!.activeSlot).toBe(-1)
-    expect(p.combat!.weapon).toBe('machinegun')
+    expect(p.combat!.weapon).toBe('coilRepeater')
     expect(stack!.mods).toEqual([{ id: 'bounce', stacks: 1 }])
   })
 
   it('a phantom MELEE weapon materializes with full durability', () => {
     const p = bareEntity()
-    p.combat!.weapon = 'wrench'
+    p.combat!.weapon = 'pressureLance'
     const res = applyModPickup(p, 'overload')
-    expect(res).toMatchObject({ modId: 'overload', weapon: 'wrench' })
+    expect(res).toMatchObject({ modId: 'overload', weapon: 'pressureLance' })
     const stack = weaponStack(p)!
-    expect(stack.itemId).toBe('wrench')
+    expect(stack.itemId).toBe('pressureLance')
     expect(stack.qty).toBe(16) // wrench durability
     expect(stack.mods).toEqual([{ id: 'overload', stacks: 1 }])
   })
@@ -178,7 +178,7 @@ describe('applyModPickup — phantom-weapon materialization (defense in depth)',
 
   it('a full inventory cannot be over-stuffed by materialization (leaves the mod on the ground)', () => {
     const p = bareEntity()
-    p.combat!.weapon = 'pistol'
+    p.combat!.weapon = 'rivetDriver'
     p.loadout!.inventory = Array.from({ length: 6 }, () => ({ itemId: 'grenade', qty: 1 }))
     const res = applyModPickup(p, 'frost')
     expect(res).toBeNull()

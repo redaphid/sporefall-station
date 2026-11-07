@@ -86,7 +86,7 @@ const armed = await waitForWorld(
 )
 const w2 = await world()
 check(armed, `scenario applied: seed 18, floor 3 (${JSON.stringify(w2)})`)
-check(w2?.weapon === 'machinegun', `armed loadout (weapon ${w2?.weapon})`)
+check(w2?.weapon === 'coilRepeater', `armed loadout (weapon ${w2?.weapon})`)
 check(!logs.some((l) => /resumed in-progress run/.test(l)), 'did not resume the save')
 await page.waitForTimeout(2000) // several autosave intervals
 check(JSON.stringify(await save()) === JSON.stringify(original), 'save untouched by the scenario run')

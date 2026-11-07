@@ -31,8 +31,9 @@ def main():
             d = ImageDraw.Draw(sheet)
             for i, f in enumerate(facings):
                 d.text((90 + i * cw + 4, 3), f, fill=(230, 230, 230))
-            for j, (arch, weapon) in enumerate(rows):
-                d.text((4, HEAD + j * ch + 4), f"{arch}\n{weapon}", fill=(230, 230, 230))
+            for j, (arch, weapon, *rest) in enumerate(rows):
+                mods = "+".join(m["id"] for m in rest[0]) if rest else ""
+                d.text((4, HEAD + j * ch + 4), f"{arch}\n{weapon}\n{mods}", fill=(230, 230, 230))
             for c in p["feet"]:
                 x, y = round(c["x"]), round(c["y"])
                 cell = raw.crop((x - W // 2, y - H + 6, x + W // 2, y + 6))

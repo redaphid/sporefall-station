@@ -291,7 +291,7 @@ describe('electrified JUMPS', () => {
     // onto the gunner. It must take the bystander instead.
     const w = worldFromRows(walledRoom(14, 9), { seed: 43 })
     const gunner = spawnNpc(w, 'drowner', 5.5, 4.5)
-    arm(gunner, 'stunGun')
+    arm(gunner, 'sparkCoil')
     const settler = spawnNpc(w, 'civilian', 6.5, 4.5)
     const bystander = spawnNpc(w, 'civilian', 8.5, 4.5)
     expect(vlen(gunner.pos.x - settler.pos.x, gunner.pos.y - settler.pos.y)).toBeLessThan(ARC_JUMP_RADIUS)

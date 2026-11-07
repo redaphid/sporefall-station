@@ -18,7 +18,7 @@ const lookOfShot = (mods: WeaponMod[]): BulletTraits => {
   const w = createWorld(1, 1)
   const p = spawnPlayer(w, 0, 20, 20)
   p.loadout!.inventory = []
-  arm(p, 'pistol').mods = mods
+  arm(p, 'rivetDriver').mods = mods
   p.facing = 0
   combatSystem(w, new Map([[0, { ...emptyInput(), attack: true }]]))
   const round = w.entities.find((e) => e.kind === 'projectile')!

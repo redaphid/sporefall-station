@@ -48,6 +48,10 @@ SEEDS = {
     "bellwether": (40, 50, 48, 58),
     "frog-settler": (58, 54, 67, 63),
     "blast-diver": (57, 55, 65, 63),
+    # The pod-carrier's e profile: the glove hangs at the hip, under the
+    # jacket hem. Unseeded, the silhouette measure took the jacket's front edge
+    # (x 58-66), 12 px ahead of the glove, and the held weapon floated there.
+    "bog-mutant": (41, 55, 49, 64),
 }
 FIST = (8, 9)  # hi-res fist box size used by the silhouette measure
 # frame name -> (x0, y0, x1, y1): corrections from the review sheet.

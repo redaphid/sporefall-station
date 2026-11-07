@@ -89,7 +89,7 @@ export const MODS: Record<string, ModDef> = {
   },
   bulk: {
     id: 'bulk', name: 'Barrage', icon: '🔱', category: 'stat', rarity: 'common',
-    blurb: 'Two extra bullets per shot — but each one hits softer.',
+    blurb: 'Two extra shots per pull — but each one hits softer.',
     // ROUNDS "Barrage": more pellets, less damage each, wider.
     add: { pellets: 2, spread: 0.12 }, mul: { damage: 0.8 },
   },
@@ -110,7 +110,7 @@ export const MODS: Record<string, ModDef> = {
   },
   velocity: {
     id: 'velocity', name: 'Hot Loads', icon: '🚀', category: 'stat', rarity: 'common',
-    blurb: 'Bullets scream downrange faster.',
+    blurb: 'Shots scream downrange faster.',
     mul: { projectileSpeed: 1.3 },
   },
   glassCannon: {
@@ -143,12 +143,12 @@ export const MODS: Record<string, ModDef> = {
   // ---- BEHAVIOR: bullet mechanics ------------------------------------------
   bounce: {
     id: 'bounce', name: 'Bouncy', icon: '🪃', category: 'behavior', rarity: 'rare',
-    blurb: 'Bullets ricochet off walls.',
+    blurb: 'Shots ricochet off walls.',
     behavior: { bounce: 2 },
   },
   pierce: {
     id: 'pierce', name: 'Piercing', icon: '🏹', category: 'behavior', rarity: 'common',
-    blurb: 'Bullets punch clean through enemies.',
+    blurb: 'Shots punch clean through enemies.',
     behavior: { pierce: 1 },
   },
   homing: {
@@ -157,19 +157,19 @@ export const MODS: Record<string, ModDef> = {
     // Reworked (playtest: "it mostly just curves bullets into walls"): a round
     // only chases enemies it can SEE, ahead of it — see projectiles.homeToward.
     // Stacks sharpen the turn AND widen the seek cone.
-    blurb: 'Smart bullets — they chase enemies they can see.',
+    blurb: 'Smart shots — they chase enemies they can see.',
     behavior: { homing: 0.10 },
   },
   explosive: {
     id: 'explosive', name: 'Explosive', icon: '💣', category: 'behavior', rarity: 'rare',
     maxStacks: 3,
-    blurb: 'Bullets blow up on impact.',
+    blurb: 'Shots blow up on impact.',
     behavior: { explodeRadius: 1.6, explodeDamage: 14 },
   },
   split: {
     id: 'split', name: 'Splinter', icon: '✳️', category: 'behavior', rarity: 'rare',
     maxStacks: 3,
-    blurb: 'Bullets burst into shards on a hit.',
+    blurb: 'Shots burst into shards on a hit.',
     behavior: { split: 2 },
   },
   splinterShot: {

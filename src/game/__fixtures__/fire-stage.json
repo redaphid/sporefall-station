@@ -810,7 +810,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "shotgun",
+        "weapon": "scatterFunnel",
         "cooldown": 0
       },
       "status": {
@@ -859,7 +859,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "status": {
@@ -908,7 +908,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "machinegun",
+        "weapon": "coilRepeater",
         "cooldown": 0
       },
       "status": {
@@ -957,7 +957,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "stunGun",
+        "weapon": "sparkCoil",
         "cooldown": 0
       },
       "status": {
@@ -1006,7 +1006,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "status": {
@@ -1055,7 +1055,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "sledgehammer",
+        "weapon": "cageRam",
         "cooldown": 0
       },
       "status": {
@@ -1160,7 +1160,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "status": {
@@ -1209,7 +1209,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "machinegun",
+        "weapon": "coilRepeater",
         "cooldown": 0
       },
       "status": {
@@ -1258,7 +1258,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "shotgun",
+        "weapon": "scatterFunnel",
         "cooldown": 0
       },
       "status": {
@@ -1307,7 +1307,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "stunGun",
+        "weapon": "sparkCoil",
         "cooldown": 0
       },
       "status": {
@@ -1356,7 +1356,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "status": {
@@ -1405,7 +1405,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "flamethrower",
+        "weapon": "phosphorHose",
         "cooldown": 0
       },
       "status": {
@@ -1454,7 +1454,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "status": {
@@ -1503,7 +1503,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "status": {
@@ -1552,7 +1552,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "status": {
@@ -1601,7 +1601,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "status": {
@@ -1650,7 +1650,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "machinegun",
+        "weapon": "coilRepeater",
         "cooldown": 0
       },
       "status": {
@@ -1699,7 +1699,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "status": {
@@ -1748,7 +1748,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "siphonSpike",
         "cooldown": 0
       },
       "status": {
@@ -1797,7 +1797,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "status": {
@@ -1846,7 +1846,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "freezeRay",
+        "weapon": "frostCondenser",
         "cooldown": 0
       },
       "status": {
@@ -1895,7 +1895,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "shotgun",
+        "weapon": "scatterFunnel",
         "cooldown": 0
       },
       "status": {
@@ -1944,7 +1944,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "status": {
@@ -1993,7 +1993,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "status": {
@@ -2042,7 +2042,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "siphonSpike",
         "cooldown": 0
       },
       "status": {
@@ -2091,7 +2091,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "stunGun",
+        "weapon": "sparkCoil",
         "cooldown": 0
       },
       "status": {
@@ -2140,7 +2140,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "freezeRay",
+        "weapon": "frostCondenser",
         "cooldown": 0
       },
       "status": {
@@ -2247,7 +2247,7 @@
     {
       "id": 33,
       "kind": "pickup",
-      "archetype": "pickup.wrench",
+      "archetype": "pickup.pressureLance",
       "pos": {
         "x": 8.5,
         "y": 4.5
@@ -2268,14 +2268,14 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "wrench",
+        "itemId": "pressureLance",
         "qty": 1
       }
     },
     {
       "id": 34,
       "kind": "pickup",
-      "archetype": "pickup.wrench",
+      "archetype": "pickup.pressureLance",
       "pos": {
         "x": 33.5,
         "y": 24.5
@@ -2296,14 +2296,14 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "wrench",
+        "itemId": "pressureLance",
         "qty": 1
       }
     },
     {
       "id": 35,
       "kind": "pickup",
-      "archetype": "pickup.wrench",
+      "archetype": "pickup.pressureLance",
       "pos": {
         "x": 15.5,
         "y": 7.5
@@ -2324,7 +2324,7 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "wrench",
+        "itemId": "pressureLance",
         "qty": 1
       }
     },
@@ -4224,7 +4224,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "status": {
@@ -4242,7 +4242,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "rivetDriver",
             "qty": 200
           }
         ],

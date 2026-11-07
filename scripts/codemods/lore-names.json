@@ -320,6 +320,10 @@
     {
       "prefix": "pnpm-lock.yaml",
       "why": "Package lockfile."
+    },
+    {
+      "prefix": "src/game/data/loreWeapons.test.ts",
+      "why": "Pins that no lore weapon name uses a mundane word, so it must name them."
     }
   ],
   "scoped": [

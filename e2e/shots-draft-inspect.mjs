@@ -15,8 +15,8 @@ const SHARE = process.env.E2E_SHARE ?? ''
 const base = JSON.parse(readFileSync(join(__dirname, '../src/game/__fixtures__/combat-stage.json'), 'utf8'))
 const w = JSON.parse(JSON.stringify(base))
 const p = w.entities.find((e) => e.playerCtl)
-p.combat.weapon = 'shotgun'
-p.loadout = { activeSlot: 0, inventory: [{ itemId: 'shotgun', qty: 99, mods: [{ id: 'bulk', stacks: 2 }, { id: 'bounce', stacks: 1 }, { id: 'frost', stacks: 1 }, { id: 'lifesteal', stacks: 2 }] }] }
+p.combat.weapon = 'scatterFunnel'
+p.loadout = { activeSlot: 0, inventory: [{ itemId: 'scatterFunnel', qty: 99, mods: [{ id: 'bulk', stacks: 2 }, { id: 'bounce', stacks: 1 }, { id: 'frost', stacks: 1 }, { id: 'lifesteal', stacks: 2 }] }] }
 const offer = ['pierce', 'frost', 'overload']
 p.playerCtl.draft = { offer, cursor: 0, until: w.tick + 100000, held: 7 }
 const pid = p.id

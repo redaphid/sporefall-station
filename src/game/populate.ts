@@ -45,15 +45,15 @@ const safeRadius = (w: World): number => (w.floor === 1 ? LANDING_SAFE_RADIUS : 
  * (see populateWorld) so weapon rolls never perturb the loot/position stream —
  * same seed → same layout, whatever the arsenal does. */
 const NPC_ARSENAL: [string, number][] = [
-  ['knife', 5],
-  ['wrench', 5],
-  ['pistol', 5],
-  ['shotgun', 2],
-  ['machinegun', 2],
-  ['sledgehammer', 1],
-  ['freezeRay', 1],
-  ['flamethrower', 1],
-  ['stunGun', 1],
+  ['siphonSpike', 5],
+  ['pressureLance', 5],
+  ['rivetDriver', 5],
+  ['scatterFunnel', 2],
+  ['coilRepeater', 2],
+  ['cageRam', 1],
+  ['frostCondenser', 1],
+  ['phosphorHose', 1],
+  ['sparkCoil', 1],
 ]
 const ARSENAL_TOTAL = NPC_ARSENAL.reduce((s, [, wt]) => s + wt, 0)
 
@@ -1123,7 +1123,10 @@ export const spawnNpc = (w: World, archetype: string, x: number, y: number, wrng
   e.health = { hp, max: hp, iframes: 0 }
   // Varied loadout when populated with a weapon stream; direct callers (tests,
   // scenarios) with no `wrng` keep the archetype's signature weapon for stability.
-  const weapon = wrng ? rollWeapon(wrng) : def.weapon
+  // A body-armed archetype (a drone) still draws its roll so the stream stays
+  // put for every NPC after it, then keeps its own natural weapon.
+  const rolled = wrng ? rollWeapon(wrng) : undefined
+  const weapon = rolled !== undefined && !def.bodyArmed ? rolled : def.weapon
   e.combat = { weapon, cooldown: 0 }
   // Slot that weapon into the SHARED loadout component so the NPC carries it just
   // like a player would — moddable, resolved through the one fire site. Innate

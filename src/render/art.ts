@@ -128,6 +128,12 @@ export interface HeldWeaponView {
   attack: readonly Texture[]
   grip: readonly [number, number]
   muzzle: readonly [number, number]
+  /** The essence accent alone, in pale ink: coloured and pulsed from the
+   * weapon's mods in place of a whole-sprite tint. Absent: tint the sprite. */
+  glow?: readonly Texture[]
+  /** Generated attachments per mod id, drawn over the weapon when it carries
+   * that mod (MOD_LAYER_ORDER). */
+  mods?: Readonly<Record<string, readonly Texture[]>>
 }
 export type HeldWeaponArt = Partial<Record<WeaponView, HeldWeaponView>>
 
@@ -398,14 +404,8 @@ export const ITEM_ALIAS: Record<string, string> = {
   //
   // Thrown explosives — the spore-grenade art was already on disk.
   grenade: 'grenade-item',
-  // Long guns wear the scatter-blaster; sidearms wear the spore-pistol.
-  machinegun: 'shotgun',
-  flamethrower: 'shotgun',
-  freezeRay: 'shotgun',
-  tranquilizer: 'pistol',
-  stunGun: 'pistol',
-  // Blunt melee wears the root-club.
-  sledgehammer: 'wrench',
+  // The lore weapons each have their own item art (theme ITEM_IDS), so no
+  // weapon borrows another's icon any more.
 }
 
 // Archetypes with a dedicated character sprite; the rest reuse the warden body.

@@ -50,23 +50,23 @@ const readState = () => {
 const guns = [
   {
     name: 'sig-ricochet-freeze-shotgun',
-    world: armed('shotgun', [{ id: 'bulk', stacks: 2 }, { id: 'bounce', stacks: 1 }, { id: 'frost', stacks: 1 }]),
+    world: armed('scatterFunnel', [{ id: 'bulk', stacks: 2 }, { id: 'bounce', stacks: 1 }, { id: 'frost', stacks: 1 }]),
     // A wall-hugging spray that freezes then shatters a room.
     expect: (s) => [s.mutantsAlive === 3 && 'freeze-shotgun cleared nothing', s.gameOver && 'unexpected game over'],
   },
   {
     name: 'sig-homing-pistol',
-    world: armed('pistol', [{ id: 'homing', stacks: 3 }, { id: 'rapid', stacks: 2 }]),
+    world: armed('rivetDriver', [{ id: 'homing', stacks: 3 }, { id: 'rapid', stacks: 2 }]),
     expect: (s) => [s.mutantsAlive === 3 && 'homing pistol hit nothing', s.playerDowned && 'player downed'],
   },
   {
     name: 'sig-nuke-cannon',
-    world: armed('machinegun', [{ id: 'explosive', stacks: 2 }, { id: 'overload', stacks: 3 }]),
+    world: armed('coilRepeater', [{ id: 'explosive', stacks: 2 }, { id: 'overload', stacks: 3 }]),
     expect: (s) => [s.mutantsAlive === 3 && 'nuke cannon cleared nothing', s.gameOver && 'unexpected game over'],
   },
   {
     name: 'sig-vampire-smg',
-    world: armed('machinegun', [{ id: 'lifesteal', stacks: 3 }, { id: 'pierce', stacks: 2 }, { id: 'rapid', stacks: 1 }], 40),
+    world: armed('coilRepeater', [{ id: 'lifesteal', stacks: 3 }, { id: 'pierce', stacks: 2 }, { id: 'rapid', stacks: 1 }], 40),
     // Mows the crowd and heals off it — survives despite starting at 40 hp.
     expect: (s) => [s.mutantsAlive === 3 && 'vampire SMG hit nothing', s.playerDowned && 'player bled out'],
   },

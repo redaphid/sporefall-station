@@ -34,11 +34,11 @@ const SIZE = { width: 1280, height: 720 }
 const modded = () => {
   const w = JSON.parse(JSON.stringify(base))
   const p = w.entities.find((e) => e.playerCtl)
-  p.combat.weapon = 'pistol'
+  p.combat.weapon = 'rivetDriver'
   p.loadout = {
     inventory: [
       {
-        itemId: 'pistol',
+        itemId: 'rivetDriver',
         qty: 200,
         mods: [
           { id: 'heavy', stacks: 1 },

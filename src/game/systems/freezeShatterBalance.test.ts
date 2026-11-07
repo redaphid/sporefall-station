@@ -25,7 +25,7 @@ import { SHATTER_DAMAGE_MULT, applyDamage } from './combat'
 import { applyStatus, isFrozen } from './statusFx'
 import { statusSystem } from './status'
 
-const PISTOL = WEAPONS.pistol
+const PISTOL = WEAPONS.rivetDriver
 const FROST = MODS.frost.onHit!
 
 /** One shot in the projectile system's order — damage first, THEN the onHit
@@ -122,7 +122,7 @@ describe('freeze + shatter is a hard hit, not an execute', () => {
     // ENEMY_MODS, so the old rule let a crossfire delete a boss by accident.
     const boss = spawnNpc(w, 'boss', 5, 5)
     const mutant = spawnNpc(w, 'mutant', 6, 5)
-    const ray = WEAPONS.freezeRay
+    const ray = WEAPONS.frostCondenser
     expect(ray.damage).toBe(0) // pure utility: it lands, deals nothing, freezes
     expect(applyDamage(w, boss, ray.damage, 6, 5, 0, mutant.id)).toBe(0)
     applyStatus(w, boss, ray.onHit!.status, ray.onHit!.ticks)
@@ -131,7 +131,7 @@ describe('freeze + shatter is a hard hit, not an execute', () => {
       w.tick++
     }
 
-    const dealt = applyDamage(w, boss, WEAPONS.wrench.damage, 6, 5, 0, mutant.id)
+    const dealt = applyDamage(w, boss, WEAPONS.pressureLance.damage, 6, 5, 0, mutant.id)
 
     expect(boss.dead).toBeFalsy()
     expect(dealt).toBe(60) // round(16 x 5 x 0.75)

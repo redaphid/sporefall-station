@@ -29,7 +29,7 @@ import { applyStatus, isFrozen } from '../game/systems/statusFx'
 import { createWorld, type World } from '../game/world'
 import { bossBar, type BossViewLike } from './bossModel'
 
-const PISTOL = WEAPONS.pistol
+const PISTOL = WEAPONS.rivetDriver
 const FROST = MODS.frost.onHit!
 
 const shoot = (w: World, target: Entity, damage = PISTOL.damage): number | null => {

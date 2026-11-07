@@ -988,12 +988,12 @@
     "prop.plant": "props/bio-planter.png",
     "prop.spore-node": "props/spore-node.png",
     "item.default": "items/biogel-kit.png",
-    "item.pistol": "items/spore-pistol.png",
-    "item.wrench": "items/root-club.png",
-    "item.knife": "items/shard-knife.png",
+    "item.rivetDriver": "items/rivetDriver.png",
+    "item.pressureLance": "items/pressureLance.png",
+    "item.siphonSpike": "items/siphonSpike.png",
     "item.medkit": "items/biogel-kit.png",
     "item.cash": "items/credit-chits.png",
-    "item.shotgun": "items/scatter-blaster.png",
+    "item.scatterFunnel": "items/scatterFunnel.png",
     "item.molotov": "items/phosphor-flask.png",
     "item.grenade-item": "items/spore-grenade.png",
     "projectile": "fx/spore-bolt.png",
@@ -1056,7 +1056,65 @@
     "char.civilian.n-walk-4": "chars/frog-settler-n-walk-4.png",
     "char.civilian.n-walk-5": "chars/frog-settler-n-walk-5.png",
     "char.civilian.n-walk-6": "chars/frog-settler-n-walk-6.png",
-    "char.civilian.n-walk-7": "chars/frog-settler-n-walk-7.png"
+    "char.civilian.n-walk-7": "chars/frog-settler-n-walk-7.png",
+    "weapon.rivetDriver.e-attack-0": "weapons/rivetDriver-e-attack-0.png",
+    "weapon.rivetDriver.e-attack-1": "weapons/rivetDriver-e-attack-1.png",
+    "weapon.rivetDriver.e-attack-2": "weapons/rivetDriver-e-attack-2.png",
+    "weapon.rivetDriver.e-glow-0": "weapons/rivetDriver-e-glow-0.png",
+    "weapon.rivetDriver.e-idle-0": "weapons/rivetDriver-e-idle-0.png",
+    "weapon.rivetDriver.e-idle-1": "weapons/rivetDriver-e-idle-1.png",
+    "weapon.rivetDriver.e-idle-2": "weapons/rivetDriver-e-idle-2.png",
+    "weapon.rivetDriver.e-mod-explosive-0": "weapons/rivetDriver-e-mod-explosive-0.png",
+    "weapon.rivetDriver.e-mod-frost-0": "weapons/rivetDriver-e-mod-frost-0.png",
+    "weapon.rivetDriver.e-mod-incendiary-0": "weapons/rivetDriver-e-mod-incendiary-0.png",
+    "weapon.rivetDriver.e-mod-shock-0": "weapons/rivetDriver-e-mod-shock-0.png",
+    "weapon.rivetDriver.n-attack-0": "weapons/rivetDriver-n-attack-0.png",
+    "weapon.rivetDriver.n-attack-1": "weapons/rivetDriver-n-attack-1.png",
+    "weapon.rivetDriver.n-attack-2": "weapons/rivetDriver-n-attack-2.png",
+    "weapon.rivetDriver.n-idle-0": "weapons/rivetDriver-n-idle-0.png",
+    "weapon.rivetDriver.n-idle-1": "weapons/rivetDriver-n-idle-1.png",
+    "weapon.rivetDriver.n-idle-2": "weapons/rivetDriver-n-idle-2.png",
+    "weapon.rivetDriver.n-mod-explosive-0": "weapons/rivetDriver-n-mod-explosive-0.png",
+    "weapon.rivetDriver.n-mod-frost-0": "weapons/rivetDriver-n-mod-frost-0.png",
+    "weapon.rivetDriver.n-mod-incendiary-0": "weapons/rivetDriver-n-mod-incendiary-0.png",
+    "weapon.rivetDriver.n-mod-shock-0": "weapons/rivetDriver-n-mod-shock-0.png",
+    "weapon.rivetDriver.ne-attack-0": "weapons/rivetDriver-ne-attack-0.png",
+    "weapon.rivetDriver.ne-attack-1": "weapons/rivetDriver-ne-attack-1.png",
+    "weapon.rivetDriver.ne-attack-2": "weapons/rivetDriver-ne-attack-2.png",
+    "weapon.rivetDriver.ne-idle-0": "weapons/rivetDriver-ne-idle-0.png",
+    "weapon.rivetDriver.ne-idle-1": "weapons/rivetDriver-ne-idle-1.png",
+    "weapon.rivetDriver.ne-idle-2": "weapons/rivetDriver-ne-idle-2.png",
+    "weapon.rivetDriver.ne-mod-explosive-0": "weapons/rivetDriver-ne-mod-explosive-0.png",
+    "weapon.rivetDriver.ne-mod-frost-0": "weapons/rivetDriver-ne-mod-frost-0.png",
+    "weapon.rivetDriver.ne-mod-incendiary-0": "weapons/rivetDriver-ne-mod-incendiary-0.png",
+    "weapon.rivetDriver.ne-mod-shock-0": "weapons/rivetDriver-ne-mod-shock-0.png",
+    "weapon.rivetDriver.s-attack-0": "weapons/rivetDriver-s-attack-0.png",
+    "weapon.rivetDriver.s-attack-1": "weapons/rivetDriver-s-attack-1.png",
+    "weapon.rivetDriver.s-attack-2": "weapons/rivetDriver-s-attack-2.png",
+    "weapon.rivetDriver.s-idle-0": "weapons/rivetDriver-s-idle-0.png",
+    "weapon.rivetDriver.s-idle-1": "weapons/rivetDriver-s-idle-1.png",
+    "weapon.rivetDriver.s-idle-2": "weapons/rivetDriver-s-idle-2.png",
+    "weapon.rivetDriver.s-mod-explosive-0": "weapons/rivetDriver-s-mod-explosive-0.png",
+    "weapon.rivetDriver.s-mod-frost-0": "weapons/rivetDriver-s-mod-frost-0.png",
+    "weapon.rivetDriver.s-mod-incendiary-0": "weapons/rivetDriver-s-mod-incendiary-0.png",
+    "weapon.rivetDriver.s-mod-shock-0": "weapons/rivetDriver-s-mod-shock-0.png",
+    "weapon.rivetDriver.se-attack-0": "weapons/rivetDriver-se-attack-0.png",
+    "weapon.rivetDriver.se-attack-1": "weapons/rivetDriver-se-attack-1.png",
+    "weapon.rivetDriver.se-attack-2": "weapons/rivetDriver-se-attack-2.png",
+    "weapon.rivetDriver.se-glow-0": "weapons/rivetDriver-se-glow-0.png",
+    "weapon.rivetDriver.se-idle-0": "weapons/rivetDriver-se-idle-0.png",
+    "weapon.rivetDriver.se-idle-1": "weapons/rivetDriver-se-idle-1.png",
+    "weapon.rivetDriver.se-idle-2": "weapons/rivetDriver-se-idle-2.png",
+    "weapon.rivetDriver.se-mod-explosive-0": "weapons/rivetDriver-se-mod-explosive-0.png",
+    "weapon.rivetDriver.se-mod-frost-0": "weapons/rivetDriver-se-mod-frost-0.png",
+    "weapon.rivetDriver.se-mod-incendiary-0": "weapons/rivetDriver-se-mod-incendiary-0.png",
+    "weapon.rivetDriver.se-mod-shock-0": "weapons/rivetDriver-se-mod-shock-0.png",
+    "item.cageRam": "items/cageRam.png",
+    "item.coilRepeater": "items/coilRepeater.png",
+    "item.phosphorHose": "items/phosphorHose.png",
+    "item.frostCondenser": "items/frostCondenser.png",
+    "item.lullDarter": "items/lullDarter.png",
+    "item.sparkCoil": "items/sparkCoil.png"
   },
   "anim": {
     "walk": 4
@@ -1064,5 +1122,59 @@
   "macroTiles": {
     "floor": 2,
     "causeway": 2
+  },
+  "weapons": {
+    "rivetDriver": {
+      "e": {
+        "grip": [
+          3,
+          10
+        ],
+        "muzzle": [
+          14,
+          7
+        ]
+      },
+      "se": {
+        "grip": [
+          4,
+          9
+        ],
+        "muzzle": [
+          14,
+          11
+        ]
+      },
+      "s": {
+        "grip": [
+          6,
+          12
+        ],
+        "muzzle": [
+          5,
+          8
+        ]
+      },
+      "ne": {
+        "grip": [
+          3,
+          18
+        ],
+        "muzzle": [
+          11,
+          10
+        ]
+      },
+      "n": {
+        "grip": [
+          6,
+          10
+        ],
+        "muzzle": [
+          5,
+          6
+        ]
+      }
+    }
   }
 }

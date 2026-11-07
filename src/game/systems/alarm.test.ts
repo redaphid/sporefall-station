@@ -32,7 +32,7 @@ import { nextFloor, setupFloor } from './missions'
 import { populateWorld } from '../populate'
 import { commitMisdeed } from './relationships'
 
-const PISTOL = WEAPONS.pistol.cooldownTicks
+const PISTOL = WEAPONS.rivetDriver.cooldownTicks
 /** Tick 0 is a decay tick, so the first shot's heat reads one less. */
 const ONE_SHOT = PISTOL - 1
 const FIRE: Partial<InputCmd> = { attack: true, aimX: 1, aimY: 0 }

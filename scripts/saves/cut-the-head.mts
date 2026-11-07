@@ -35,7 +35,7 @@ s.put(20, 1, 'E')
 
 const w = worldFromState({ level: levelFromJson({ rows: s.rows }) })
 const player = spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
-arm(player, 'machinegun', [
+arm(player, 'coilRepeater', [
   { id: 'heavy', stacks: 2 },
   { id: 'pierce', stacks: 1 },
   { id: 'lifesteal', stacks: 2 },

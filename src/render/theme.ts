@@ -10,6 +10,7 @@
 
 import { ANIM_STATES, cadenceOf, DEFAULT_TPF, MAX_ANIM_FRAMES, type AnimStateName } from './animState'
 import { WEAPONS } from '../game/data/items'
+import { MODS } from '../game/data/mods'
 
 // The hi-res Sporefall Station pack (artScale 2 — themeLoader bakes it at
 // double texture density over the same logical sizes) is the default theme.
@@ -66,7 +67,11 @@ export const CHAR_NAMES = ['player', 'warden', 'mutant', 'civilian', 'scientist'
   'brute', 'cinder', 'sporeling', 'stalker', 'lurker', 'pod',
   // The group roster (systems/groups.ts) — canonical for the same reason.
   'drowner', 'bellwether', 'mender', 'breacher', 'lobber', 'gloamhound', 'hivespire'] as const
-export const ITEM_IDS = ['pistol', 'wrench', 'knife', 'medkit', 'cash', 'shotgun', 'molotov', 'grenade-item'] as const
+export const ITEM_IDS = [
+  'rivetDriver', 'pressureLance', 'siphonSpike', 'medkit', 'cash', 'scatterFunnel', 'molotov', 'grenade-item',
+  // The lore weapons each ship their own loot icon (generated from the same render as the held art).
+  'cageRam', 'coilRepeater', 'phosphorHose', 'frostCondenser', 'lullDarter', 'sparkCoil',
+] as const
 // The six sporeforge furnishings (shelf/bunk/bench/table/plant/spore-node) and
 // `crate` are canonical for the same reason `boss` is above: a prop key that is
 // not listed here is not canonical, so validateManifest DROPS the mapping and
@@ -123,6 +128,7 @@ export const WALL_CAP_NAMES = ['wall', 'hull'] as const
 // as two clips: `idle` (a loop while held) and `attack` (a one-shot spread
 // over the attack window: the shot or the swing). Key grammar:
 //   weapon.<id>.<view>-<state>-<n>    n contiguous from 0
+//   weapon.<id>.<view>-glow-<n>, weapon.<id>.<view>-mod-<modId>-<n>  layers
 // Frames are authored on the pack's character pixel grid (artScale) and drawn
 // unscaled. The grip and muzzle pixels of each view live in the manifest's
 // `weapons` section. A weapon a pack does not draw is not drawn at all.
@@ -140,6 +146,16 @@ export const WEAPON_VIEW_FALLBACK: Record<WeaponView, readonly WeaponView[]> = {
 }
 export type WeaponState = 'idle' | 'attack'
 export const WEAPON_STATES: readonly WeaponState[] = ['idle', 'attack']
+/** Optional LAYERS drawn over a view's frames, registered on the same grip
+ * (every frame of a view shares one canvas):
+ *   weapon.<id>.<view>-glow-<n>         the essence accent alone (a mask in
+ *                                       pale ink): the renderer colours and
+ *                                       pulses ONLY it from the weapon's mods,
+ *                                       instead of tinting the whole sprite
+ *   weapon.<id>.<view>-mod-<modId>-<n>  a generated attachment one mod adds
+ *                                       (frost fins, an igniter, a Tesla coil)
+ * Both loop on the idle clock. */
+export const WEAPON_LAYERS: readonly string[] = ['glow', ...Object.keys(MODS).map((m) => `mod-${m}`)]
 /** Weapon ids that can carry held art: every carried (non-natural) weapon. */
 export const HELD_WEAPON_IDS: readonly string[] = Object.values(WEAPONS)
   .filter((w) => w.natural !== true)
@@ -189,7 +205,7 @@ const buildSpriteKeys = (): Set<string> => {
   for (const k of FX_KEYS) keys.add(k)
   for (const id of HELD_WEAPON_IDS)
     for (const v of WEAPON_VIEWS)
-      for (const s of WEAPON_STATES)
+      for (const s of [...WEAPON_STATES, ...WEAPON_LAYERS])
         for (let n = 0; n < MAX_ANIM_FRAMES; n++) keys.add(`weapon.${id}.${v}-${s}-${n}`)
   return keys
 }

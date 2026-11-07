@@ -52,13 +52,23 @@ export interface WeaponDef {
   rechargeOnWrap?: number
 }
 
+// LORE WEAPONS. Canon tie 2 (docs/LORE.md): weapons are bubble-burst plumbing,
+// not guns; LORE_CHARACTERS G2: "a weapon is a stolen section of an essence
+// still". Every carried weapon is a colony still-section, and each kept the
+// combat numbers of the mundane weapon it replaced byte for byte
+// (loreWeapons.test.ts pins them), so balance did not move:
+//   pistol -> rivetDriver        wrench -> pressureLance   knife -> siphonSpike
+//   sledgehammer -> cageRam   shotgun -> scatterFunnel  machinegun -> coilRepeater
+//   flamethrower -> phosphorHose   freezeRay -> frostCondenser
+//   tranquilizer -> lullDarter     stunGun -> sparkCoil
+// scripts/rename-weapon-ids.py converts other branches' uses of the old ids.
 export const WEAPONS: Record<string, WeaponDef> = {
   fists: { id: 'fists', name: 'Fists', kind: 'melee', damage: 8, range: 1.1, cooldownTicks: 12, knockback: 4, natural: true },
-  wrench: { id: 'wrench', name: 'Wrench', kind: 'melee', damage: 16, range: 1.3, cooldownTicks: 15, knockback: 7, durability: 16 },
-  knife: { id: 'knife', name: 'Knife', kind: 'melee', damage: 12, range: 1.1, cooldownTicks: 9, knockback: 2, durability: 20 },
-  sledgehammer: {
-    id: 'sledgehammer',
-    name: 'Sledgehammer',
+  pressureLance: { id: 'pressureLance', name: 'Pressure Lance', kind: 'melee', damage: 16, range: 1.3, cooldownTicks: 15, knockback: 7, durability: 16 },
+  siphonSpike: { id: 'siphonSpike', name: 'Siphon Spike', kind: 'melee', damage: 12, range: 1.1, cooldownTicks: 9, knockback: 2, durability: 20 },
+  cageRam: {
+    id: 'cageRam',
+    name: 'Cage Ram',
     kind: 'melee',
     damage: 26,
     range: 1.4,
@@ -91,10 +101,15 @@ export const WEAPONS: Record<string, WeaponDef> = {
   // a balance change, not a relabel.
   fangs: { id: 'fangs', name: 'Fangs', kind: 'melee', damage: 12, range: 1.1, cooldownTicks: 9, knockback: 2, durability: 20, natural: true },
   mandibles: { id: 'mandibles', name: 'Mandibles', kind: 'melee', damage: 12, range: 1.1, cooldownTicks: 9, knockback: 2, durability: 20, natural: true },
+  // The Spore Warden is a drone (char.warden draws the spore-drone): machinery,
+  // not a tool user, so a drawn tool in its "hand" read as wrong as a hound's
+  // knife. Its grapple arms are its weapon, at the old wrench's numbers and
+  // durability exactly (the same relabel as the beasts above).
+  grappleArms: { id: 'grappleArms', name: 'Grapple Arms', kind: 'melee', damage: 16, range: 1.3, cooldownTicks: 15, knockback: 7, durability: 16, natural: true },
   horns: { id: 'horns', name: 'Horns', kind: 'melee', damage: 16, range: 1.3, cooldownTicks: 15, knockback: 7, durability: 16, natural: true },
-  pistol: {
-    id: 'pistol',
-    name: 'Pistol',
+  rivetDriver: {
+    id: 'rivetDriver',
+    name: 'Rivet Driver',
     kind: 'ranged',
     damage: 14,
     range: 10,
@@ -106,9 +121,9 @@ export const WEAPONS: Record<string, WeaponDef> = {
     castsPerTrigger: 1,
     rechargeOnWrap: 20,
   },
-  shotgun: {
-    id: 'shotgun',
-    name: 'Shotgun',
+  scatterFunnel: {
+    id: 'scatterFunnel',
+    name: 'Scatter Funnel',
     kind: 'ranged',
     damage: 7,
     range: 6,
@@ -122,9 +137,9 @@ export const WEAPONS: Record<string, WeaponDef> = {
     castsPerTrigger: 2,
     rechargeOnWrap: 30,
   },
-  machinegun: {
-    id: 'machinegun',
-    name: 'Machine Gun',
+  coilRepeater: {
+    id: 'coilRepeater',
+    name: 'Coil Repeater',
     kind: 'ranged',
     damage: 8,
     range: 9,
@@ -136,9 +151,9 @@ export const WEAPONS: Record<string, WeaponDef> = {
     castsPerTrigger: 1,
     rechargeOnWrap: 45,
   },
-  freezeRay: {
-    id: 'freezeRay',
-    name: 'Freeze Ray',
+  frostCondenser: {
+    id: 'frostCondenser',
+    name: 'Frost Condenser',
     kind: 'ranged',
     damage: 0,
     range: 8,
@@ -147,9 +162,9 @@ export const WEAPONS: Record<string, WeaponDef> = {
     projectileSpeed: 13,
     onHit: { status: 'frozen', ticks: 120 },
   },
-  tranquilizer: {
-    id: 'tranquilizer',
-    name: 'Tranquilizer',
+  lullDarter: {
+    id: 'lullDarter',
+    name: 'Lull Darter',
     kind: 'ranged',
     damage: 0,
     range: 8,
@@ -158,9 +173,9 @@ export const WEAPONS: Record<string, WeaponDef> = {
     projectileSpeed: 13,
     onHit: { status: 'sleep', ticks: 150 },
   },
-  flamethrower: {
-    id: 'flamethrower',
-    name: 'Flamethrower',
+  phosphorHose: {
+    id: 'phosphorHose',
+    name: 'Phosphor Hose',
     kind: 'ranged',
     damage: 3,
     range: 5,
@@ -169,9 +184,9 @@ export const WEAPONS: Record<string, WeaponDef> = {
     projectileSpeed: 11,
     onHit: { status: 'burning', ticks: 240 },
   },
-  stunGun: {
-    id: 'stunGun',
-    name: 'Stun Gun',
+  sparkCoil: {
+    id: 'sparkCoil',
+    name: 'Spark Coil',
     kind: 'ranged',
     damage: 2,
     range: 5,

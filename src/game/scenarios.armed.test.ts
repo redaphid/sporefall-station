@@ -85,8 +85,8 @@ describe('armed scenario', () => {
       const p = players[0]
       expect(p.dead).toBeFalsy()
       expect(p.health).toMatchObject({ hp: ARMED_HP, max: ARMED_HP })
-      expect(p.combat?.weapon).toBe('machinegun')
-      const gun = p.loadout!.inventory.find((s) => s.itemId === 'machinegun')
+      expect(p.combat?.weapon).toBe('coilRepeater')
+      const gun = p.loadout!.inventory.find((s) => s.itemId === 'coilRepeater')
       expect(gun?.mods?.length).toBeGreaterThanOrEqual(4)
       expect(p.loadout!.inventory.find((s) => s.itemId === 'grenade')?.qty).toBe(ARMED_GRENADES)
 

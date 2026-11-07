@@ -12,6 +12,10 @@ export type PeerId = string
  * through the gate, and then the older peer quietly renders every new object
  * as another copy of the player. Nothing errors; the game just lies.
  *
+ * 15 — the lore weapons: every weapon id was renamed (pistol -> rivetDriver,
+ *     wrench -> pressureLance, ...; scripts/rename-weapon-ids.py) and the
+ *     `pickup.<id>` archetypes appended. An old peer would send and expect ids
+ *     this build classes as 'unknown' items.
  * 14 — no wire change, but floor 1 now draws its district too, every
  *     district lays out its own way (the Concourse and the Moorings replace
  *     the old downtown and slums districts), and floor 1's map is no longer the
@@ -51,7 +55,7 @@ export type PeerId = string
  *     registered rather than only the enemies.
  * 1 — initial.
  */
-export const PROTOCOL_VERSION = 14
+export const PROTOCOL_VERSION = 15
 
 /** GATT service/characteristic UUIDs (BLE transport). */
 export const BLE_SERVICE_UUID = '5f47a3c0-9b1e-4a52-8f6d-2c3e4b5a6d70'

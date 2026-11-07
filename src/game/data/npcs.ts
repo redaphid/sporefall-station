@@ -17,6 +17,13 @@ export interface NpcDef {
    * that contradicts an archetype's behaviour just mislabels it to the player. */
   hostility: 'always' | 'watchful' | 'never'
   fleesOnDamage: boolean
+  /** Fights with its own BODY, never a carried weapon: a beast, or a drone
+   * (the Spore Warden and Airlock Warden draw the spore-drone). Populate's
+   * arsenal roll (populate.rollWeapon) is still drawn, so the weapon stream
+   * stays put for everyone else, but discarded: the archetype keeps its
+   * natural `weapon`. Without this a populated drone got handed a rolled
+   * Rivet Driver or Siphon Spike and the renderer hung it off a claw. */
+  bodyArmed?: true
   /** Peaceful until hit, then fights back (lockkeepers). */
   retaliates?: boolean
   /** Behavior registry id (systems/behaviors.ts) newly spawned NPCs of this
@@ -52,8 +59,8 @@ export interface NpcDef {
  * weapon already out is not drawn twice in a second. */
 export const DRAW_REARM_TICKS = 30
 
-/** The wind-up of every pistol carrier: an 8-frame draw at tpf 2. */
-const PISTOL_DRAW_TICKS = 16
+/** The wind-up of every Rivet Driver carrier: an 8-frame draw at tpf 2. */
+const RIVET_DRIVER_DRAW_TICKS = 16
 
 export const NPCS: Record<string, NpcDef> = {
   mutant: {
@@ -61,7 +68,7 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'rootcult',
     hp: 40,
     speed: 3.4,
-    weapon: 'wrench',
+    weapon: 'pressureLance',
     sightRange: 7,
     hostility: 'always',
     fleesOnDamage: false,
@@ -109,7 +116,8 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'warden',
     hp: 60,
     speed: 4.0,
-    weapon: 'wrench',
+    weapon: 'grappleArms',
+    bodyArmed: true,
     sightRange: 8,
     hostility: 'watchful',
     fleesOnDamage: false,
@@ -119,8 +127,8 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'rootcult',
     hp: 35,
     speed: 3.6,
-    weapon: 'pistol',
-    drawTicks: PISTOL_DRAW_TICKS,
+    weapon: 'rivetDriver',
+    drawTicks: RIVET_DRIVER_DRAW_TICKS,
     sightRange: 8,
     hostility: 'always',
     fleesOnDamage: false,
@@ -132,6 +140,7 @@ export const NPCS: Record<string, NpcDef> = {
     hp: 90,
     speed: 3.0,
     weapon: 'fists',
+    bodyArmed: true,
     sightRange: 5,
     hostility: 'never',
     fleesOnDamage: false,
@@ -153,7 +162,7 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'civ',
     hp: 45,
     speed: 3.2,
-    weapon: 'wrench',
+    weapon: 'pressureLance',
     sightRange: 6,
     hostility: 'never',
     fleesOnDamage: false,
@@ -298,8 +307,8 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'rootcult',
     hp: 38,
     speed: 3.4,
-    weapon: 'pistol',
-    drawTicks: PISTOL_DRAW_TICKS,
+    weapon: 'rivetDriver',
+    drawTicks: RIVET_DRIVER_DRAW_TICKS,
     sightRange: 9,
     hostility: 'always',
     fleesOnDamage: false,
@@ -314,8 +323,8 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'rootcult',
     hp: 90,
     speed: 3.0,
-    weapon: 'pistol',
-    drawTicks: PISTOL_DRAW_TICKS,
+    weapon: 'rivetDriver',
+    drawTicks: RIVET_DRIVER_DRAW_TICKS,
     sightRange: 10,
     hostility: 'always',
     fleesOnDamage: false,
@@ -345,7 +354,7 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'rootcult',
     hp: 62,
     speed: 3.0,
-    weapon: 'wrench',
+    weapon: 'pressureLance',
     sightRange: 9,
     hostility: 'always',
     fleesOnDamage: false,

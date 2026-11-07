@@ -1,0 +1,513 @@
+{
+  "v": 1,
+  "seed": 1106,
+  "floor": 1,
+  "tick": 0,
+  "nextId": 8,
+  "alarm": 0,
+  "gameOver": false,
+  "mission": {
+    "template": "reach",
+    "complete": true,
+    "exitUnlocked": true,
+    "description": "Reach the Launch Bay"
+  },
+  "noises": [],
+  "events": [],
+  "rng": 1735418831,
+  "baseRng": 1106,
+  "level": {
+    "rows": [
+      "##############################",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,.,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "##############################"
+    ],
+    "spawn": {
+      "x": 5.5,
+      "y": 9.5
+    },
+    "exit": {
+      "x": -1,
+      "y": -1
+    }
+  },
+  "entities": [
+    {
+      "id": 1,
+      "kind": "player",
+      "archetype": "player",
+      "pos": {
+        "x": 5.5,
+        "y": 9.5
+      },
+      "prevPos": {
+        "x": 5.5,
+        "y": 9.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.5,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 500,
+        "max": 500,
+        "iframes": 90
+      },
+      "combat": {
+        "weapon": "shotgun",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "shotgun",
+            "qty": 1,
+            "mods": []
+          }
+        ],
+        "activeSlot": 0
+      },
+      "playerCtl": {
+        "playerId": 0,
+        "abilityCooldown": 0,
+        "cash": 0,
+        "misdeedUntilTick": 0
+      }
+    },
+    {
+      "id": 2,
+      "kind": "npc",
+      "archetype": "gloamhound",
+      "pos": {
+        "x": 12.5,
+        "y": 6.5
+      },
+      "prevPos": {
+        "x": 12.5,
+        "y": 6.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.2,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 32,
+        "max": 32,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fangs",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "fangs",
+            "qty": 20
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "spore": 0,
+        "poisoned": 0.6
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "neutral",
+        "home": {
+          "x": 12.5,
+          "y": 6.5
+        },
+        "thinkAt": 0,
+        "sightRange": 10,
+        "behavior": "hound",
+        "group": {
+          "id": 1,
+          "role": "hound"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "kind": "npc",
+      "archetype": "gloamhound",
+      "pos": {
+        "x": 13.5,
+        "y": 6.5
+      },
+      "prevPos": {
+        "x": 13.5,
+        "y": 6.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.2,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 32,
+        "max": 32,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fangs",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "fangs",
+            "qty": 20
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "spore": 0,
+        "poisoned": 0.6
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "neutral",
+        "home": {
+          "x": 12.5,
+          "y": 6.5
+        },
+        "thinkAt": 0,
+        "sightRange": 10,
+        "behavior": "hound",
+        "group": {
+          "id": 1,
+          "role": "hound"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "kind": "npc",
+      "archetype": "gloamhound",
+      "pos": {
+        "x": 11.5,
+        "y": 6.5
+      },
+      "prevPos": {
+        "x": 11.5,
+        "y": 6.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.2,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 32,
+        "max": 32,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fangs",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "fangs",
+            "qty": 20
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "spore": 0,
+        "poisoned": 0.6
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "neutral",
+        "home": {
+          "x": 12.5,
+          "y": 6.5
+        },
+        "thinkAt": 0,
+        "sightRange": 10,
+        "behavior": "hound",
+        "group": {
+          "id": 1,
+          "role": "hound"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "kind": "npc",
+      "archetype": "stalker",
+      "pos": {
+        "x": 12.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 12.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.2,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 30,
+        "max": 30,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fangs",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "fangs",
+            "qty": 20
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "poisoned": 0.4,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "neutral",
+        "home": {
+          "x": 12.5,
+          "y": 12.5
+        },
+        "thinkAt": 0,
+        "sightRange": 10,
+        "behavior": "predator"
+      }
+    },
+    {
+      "id": 6,
+      "kind": "npc",
+      "archetype": "stalker",
+      "pos": {
+        "x": 14.5,
+        "y": 13.5
+      },
+      "prevPos": {
+        "x": 14.5,
+        "y": 13.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.2,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 30,
+        "max": 30,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fangs",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "fangs",
+            "qty": 20
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "poisoned": 0.4,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "neutral",
+        "home": {
+          "x": 14.5,
+          "y": 13.5
+        },
+        "thinkAt": 0,
+        "sightRange": 10,
+        "behavior": "predator"
+      }
+    },
+    {
+      "id": 7,
+      "kind": "npc",
+      "archetype": "brute",
+      "pos": {
+        "x": 15.5,
+        "y": 9.5
+      },
+      "prevPos": {
+        "x": 15.5,
+        "y": 9.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 2.5,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 95,
+        "max": 95,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "horns",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "horns",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "physical": 0.35,
+        "burning": 1.5,
+        "poisoned": 1
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "neutral",
+        "home": {
+          "x": 15.5,
+          "y": 9.5
+        },
+        "thinkAt": 0,
+        "sightRange": 8,
+        "behavior": "hunter"
+      }
+    }
+  ],
+  "groups": {
+    "seq": 1,
+    "list": [
+      {
+        "id": 1,
+        "kind": "pack",
+        "phase": "prowl",
+        "since": 0,
+        "size": 3,
+        "rally": {
+          "x": 12.5,
+          "y": 6.5
+        }
+      }
+    ]
+  }
+}

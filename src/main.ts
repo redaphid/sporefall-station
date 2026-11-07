@@ -33,11 +33,15 @@ import {
   readDeepLink,
   resumesSave,
   unknownScenarioMessage,
+  unknownPlayMessage,
   unknownWorldMessage,
   wantsFreshBuild,
 } from './app/deepLink'
 import { SCENES } from './scenes/registry'
-import { deserializeWorld, type WorldJson } from './game/serialize'
+import { makeBot } from './scenes/bot'
+import { findPlayable, PLAYABLES } from './playable/registry'
+import { buildPlayWorld } from './playable/start'
+import { deserializeWorld, serializeWorld, type WorldJson } from './game/serialize'
 import type { World } from './game/world'
 import { createPersister, readSave, type KeyValueStore, type Persister } from './app/persistence'
 import { loadSettings } from './app/settings'
@@ -93,6 +97,7 @@ import {
   noteFrameOk,
 } from './ui/frameErrorModel'
 import { createLobbyUi, pickHost, pickMode, type GameMode } from './ui/menu'
+import { TEST_SCENARIOS_HASH } from './ui/testScenarios'
 import { createScreens, restartAffordance } from './ui/screens'
 import { createOverlay } from './ui/overlay'
 import { installStage, lockLandscape, toStage } from './ui/orientation'
@@ -226,16 +231,28 @@ const boot = async (): Promise<void> => {
     showBootError(uiMount, msg)
     return
   }
+  // `?play=<id>`: a scenario from the start menu's Test scenarios list.
+  const play = link.play !== null ? findPlayable(link.play) : undefined
+  if (link.play !== null && !play) {
+    const msg = unknownPlayMessage(link.play, PLAYABLES.map((p) => p.id), APP_VERSION)
+    console.error(`sporefall: ${msg}`)
+    showBootError(uiMount, msg)
+    return
+  }
   // A `?state=` link or a `?world=` save IS the intent: someone was sent an
   // exact world to play, so boot straight into it rather than making them pick
   // Solo from the menu first (which would also build a throwaway world before
   // replacing it). Both restore into SINGLE-PLAYER — see the blocks below.
   const sharedState = params.get('state')
-  const exactWorld = sharedState ?? params.get('world')
+  const exactWorld = sharedState ?? params.get('world') ?? link.play
   // The third argument adds the Settings entry (opens the panel over the menu
   // with controller navigation armed) — the pad-only player's route to button
   // remapping, e.g. binding the zoom buttons.
-  const startMenu = (): Promise<GameMode> => pickMode(uiMount, requestFullscreenOnGesture, renderer.settingsUi)
+  const startMenu = (): Promise<GameMode> =>
+    pickMode(uiMount, requestFullscreenOnGesture, renderer.settingsUi, {
+      // Main menu from a test scenario lands back on its list.
+      openScenarios: location.hash === TEST_SCENARIOS_HASH,
+    })
   let mode = (params.get('mode') as GameMode | null) ?? (exactWorld ? 'solo' : await startMenu())
   // "Play online" settles into hosting or joining a coded room on the relay;
   // backing out of it returns to the start menu.
@@ -258,6 +275,9 @@ const boot = async (): Promise<void> => {
   // which press-to-joins each pad as player 0 (first pad) then 1, 2, 3.
   // A `?script=` deterministic input timeline replaces live input for e2e videos.
   const script = params.get('script') ? SCRIPTS[params.get('script')!] : undefined
+  // `?play=<id>&demo`: the scenario's own scripted player drives player 0 (the
+  // card-screenshot capture uses it), reading the live host world each tick.
+  const demoBot = play?.demo && params.has('demo') ? makeBot(play.demo) : undefined
   // View-only zoom control: pinch (touch) + scrollwheel (desktop) + held pad
   // buttons (padZoom, below), all routed through the camera's smooth, anchored
   // zoom target. Zero effect on the sim. The player's zoom is restored from the
@@ -303,8 +323,12 @@ const boot = async (): Promise<void> => {
     return pointerAim(ps.x, ps.y, pointerScreen.x, pointerScreen.y)
   }
   let touch: TouchInput | undefined
-  let input: InputSource = script ? createScriptedInput(script) : createKeyboard(readPointerAim)
-  if (!script && navigator.maxTouchPoints > 0) {
+  let input: InputSource = script
+    ? createScriptedInput(script)
+    : demoBot
+      ? { sample: () => (session instanceof HostSession ? demoBot(session.world) : emptyInput()) }
+      : createKeyboard(readPointerAim)
+  if (!script && !demoBot && navigator.maxTouchPoints > 0) {
     touch = createTouch(uiMount, zoomSink)
     input = mergeInputs(input, touch)
   }
@@ -406,6 +430,7 @@ const boot = async (): Promise<void> => {
       inject(loadFixtureJson(worldParam))
     }
   }
+  if (play && session instanceof HostSession) injectWorld!(serializeWorld(buildPlayWorld(play.start)))
   // `?state=<id>` — a SHAREABLE debug state: the same exact-world injection as
   // `?world=`, but fetched from the Worker instead of read out of the bundle, so
   // a link can be sent to someone who does not have the fixture (or the repo).
@@ -1173,7 +1198,9 @@ const runLoop = (
       persister?.clear()
     },
     closeNet: () => session.close?.() ?? Promise.resolve(),
-    goToMenu: () => location.replace(import.meta.env.BASE_URL),
+    // Out of a test scenario, back to the Test scenarios list.
+    goToMenu: () =>
+      location.replace(import.meta.env.BASE_URL + (new URLSearchParams(location.search).has('play') ? TEST_SCENARIOS_HASH : '')),
     wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   })
   const onMainMenu = (): void => void quitToMenu()

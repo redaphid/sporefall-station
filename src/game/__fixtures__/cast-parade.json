@@ -1,0 +1,1078 @@
+{
+  "v": 1,
+  "seed": 1106,
+  "floor": 1,
+  "tick": 0,
+  "nextId": 14,
+  "alarm": 0,
+  "gameOver": false,
+  "mission": {
+    "template": "reach",
+    "complete": true,
+    "exitUnlocked": true,
+    "description": "Reach the Launch Bay"
+  },
+  "noises": [],
+  "events": [],
+  "rng": 1735418831,
+  "baseRng": 1106,
+  "level": {
+    "rows": [
+      "####################################",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,.,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "####################################"
+    ],
+    "spawn": {
+      "x": 3.5,
+      "y": 14.5
+    },
+    "exit": {
+      "x": -1,
+      "y": -1
+    }
+  },
+  "entities": [
+    {
+      "id": 1,
+      "kind": "player",
+      "archetype": "player",
+      "pos": {
+        "x": 3.5,
+        "y": 14.5
+      },
+      "prevPos": {
+        "x": 3.5,
+        "y": 14.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.5,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 120,
+        "max": 120,
+        "iframes": 90
+      },
+      "combat": {
+        "weapon": "pistol",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "pistol",
+            "qty": 1,
+            "mods": []
+          }
+        ],
+        "activeSlot": 0
+      },
+      "playerCtl": {
+        "playerId": 0,
+        "abilityCooldown": 0,
+        "cash": 0,
+        "misdeedUntilTick": 0
+      }
+    },
+    {
+      "id": 2,
+      "kind": "npc",
+      "archetype": "robot",
+      "pos": {
+        "x": 8.5,
+        "y": 2.5
+      },
+      "prevPos": {
+        "x": 8.5,
+        "y": 2.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 2.6,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 70,
+        "max": 70,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "physical": 0.4,
+        "burning": 1.5,
+        "poisoned": 0,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "civ",
+        "home": {
+          "x": 8.5,
+          "y": 2.5
+        },
+        "thinkAt": 0,
+        "sightRange": 7,
+        "rel": {
+          "1": {
+            "hate": 0,
+            "fear": 0
+          }
+        },
+        "dormant": false,
+        "behavior": "patrol",
+        "params": {
+          "waypoints": [
+            {
+              "x": 7.5,
+              "y": 2.5
+            },
+            {
+              "x": 32.5,
+              "y": 2.5
+            }
+          ]
+        },
+        "patrolIndex": 0
+      }
+    },
+    {
+      "id": 3,
+      "kind": "npc",
+      "archetype": "mutant",
+      "pos": {
+        "x": 13.5,
+        "y": 4.5
+      },
+      "prevPos": {
+        "x": 13.5,
+        "y": 4.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 40,
+        "max": 40,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "wrench",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "wrench",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "civ",
+        "home": {
+          "x": 13.5,
+          "y": 4.5
+        },
+        "thinkAt": 0,
+        "sightRange": 7,
+        "rel": {
+          "1": {
+            "hate": 0,
+            "fear": 0
+          }
+        },
+        "dormant": false,
+        "behavior": "patrol",
+        "params": {
+          "waypoints": [
+            {
+              "x": 7.5,
+              "y": 4.5
+            },
+            {
+              "x": 32.5,
+              "y": 4.5
+            }
+          ]
+        },
+        "patrolIndex": 0
+      }
+    },
+    {
+      "id": 4,
+      "kind": "npc",
+      "archetype": "lurker",
+      "pos": {
+        "x": 18.5,
+        "y": 6.5
+      },
+      "prevPos": {
+        "x": 18.5,
+        "y": 6.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.6,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 28,
+        "max": 28,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "mandibles",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "mandibles",
+            "qty": 20
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "spore": 0,
+        "poisoned": 0.5
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "civ",
+        "home": {
+          "x": 18.5,
+          "y": 6.5
+        },
+        "thinkAt": 0,
+        "sightRange": 8,
+        "behavior": "patrol",
+        "dormant": false,
+        "rel": {
+          "1": {
+            "hate": 0,
+            "fear": 0
+          }
+        },
+        "params": {
+          "waypoints": [
+            {
+              "x": 7.5,
+              "y": 6.5
+            },
+            {
+              "x": 32.5,
+              "y": 6.5
+            }
+          ]
+        },
+        "patrolIndex": 0
+      }
+    },
+    {
+      "id": 5,
+      "kind": "npc",
+      "archetype": "brute",
+      "pos": {
+        "x": 23.5,
+        "y": 8.5
+      },
+      "prevPos": {
+        "x": 23.5,
+        "y": 8.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 2.5,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 95,
+        "max": 95,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "horns",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "horns",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "physical": 0.35,
+        "burning": 1.5,
+        "poisoned": 1
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "civ",
+        "home": {
+          "x": 23.5,
+          "y": 8.5
+        },
+        "thinkAt": 0,
+        "sightRange": 8,
+        "behavior": "patrol",
+        "rel": {
+          "1": {
+            "hate": 0,
+            "fear": 0
+          }
+        },
+        "dormant": false,
+        "params": {
+          "waypoints": [
+            {
+              "x": 7.5,
+              "y": 8.5
+            },
+            {
+              "x": 32.5,
+              "y": 8.5
+            }
+          ]
+        },
+        "patrolIndex": 0
+      }
+    },
+    {
+      "id": 6,
+      "kind": "npc",
+      "archetype": "bellwether",
+      "pos": {
+        "x": 8.5,
+        "y": 10.5
+      },
+      "prevPos": {
+        "x": 8.5,
+        "y": 10.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 90,
+        "max": 90,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "pistol",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "pistol",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "physical": 0.8,
+        "burning": 1.2
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "civ",
+        "home": {
+          "x": 8.5,
+          "y": 10.5
+        },
+        "thinkAt": 0,
+        "sightRange": 10,
+        "behavior": "patrol",
+        "rel": {
+          "1": {
+            "hate": 0,
+            "fear": 0
+          }
+        },
+        "dormant": false,
+        "params": {
+          "waypoints": [
+            {
+              "x": 7.5,
+              "y": 10.5
+            },
+            {
+              "x": 32.5,
+              "y": 10.5
+            }
+          ]
+        },
+        "patrolIndex": 0
+      }
+    },
+    {
+      "id": 7,
+      "kind": "npc",
+      "archetype": "cinder",
+      "pos": {
+        "x": 13.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 13.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 45,
+        "max": 45,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "physical": 1.1,
+        "burning": 0.2
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "civ",
+        "home": {
+          "x": 13.5,
+          "y": 12.5
+        },
+        "thinkAt": 0,
+        "sightRange": 8,
+        "behavior": "patrol",
+        "rel": {
+          "1": {
+            "hate": 0,
+            "fear": 0
+          }
+        },
+        "dormant": false,
+        "params": {
+          "waypoints": [
+            {
+              "x": 7.5,
+              "y": 12.5
+            },
+            {
+              "x": 32.5,
+              "y": 12.5
+            }
+          ]
+        },
+        "patrolIndex": 0
+      }
+    },
+    {
+      "id": 8,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 18.5,
+        "y": 14.5
+      },
+      "prevPos": {
+        "x": 18.5,
+        "y": 14.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "civ",
+        "home": {
+          "x": 18.5,
+          "y": 14.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "patrol",
+        "rel": {
+          "1": {
+            "hate": 0,
+            "fear": 0
+          }
+        },
+        "dormant": false,
+        "params": {
+          "waypoints": [
+            {
+              "x": 7.5,
+              "y": 14.5
+            },
+            {
+              "x": 32.5,
+              "y": 14.5
+            }
+          ]
+        },
+        "patrolIndex": 0
+      }
+    },
+    {
+      "id": 9,
+      "kind": "npc",
+      "archetype": "drowner",
+      "pos": {
+        "x": 23.5,
+        "y": 16.5
+      },
+      "prevPos": {
+        "x": 23.5,
+        "y": 16.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 38,
+        "max": 38,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "pistol",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "pistol",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "poisoned": 0.7,
+        "spore": 0.5
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "civ",
+        "home": {
+          "x": 23.5,
+          "y": 16.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "patrol",
+        "rel": {
+          "1": {
+            "hate": 0,
+            "fear": 0
+          }
+        },
+        "dormant": false,
+        "params": {
+          "waypoints": [
+            {
+              "x": 7.5,
+              "y": 16.5
+            },
+            {
+              "x": 32.5,
+              "y": 16.5
+            }
+          ]
+        },
+        "patrolIndex": 0
+      }
+    },
+    {
+      "id": 10,
+      "kind": "npc",
+      "archetype": "mender",
+      "pos": {
+        "x": 8.5,
+        "y": 18.5
+      },
+      "prevPos": {
+        "x": 8.5,
+        "y": 18.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.3,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 44,
+        "max": 44,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "poisoned": 0.2,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "civ",
+        "home": {
+          "x": 8.5,
+          "y": 18.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "patrol",
+        "rel": {
+          "1": {
+            "hate": 0,
+            "fear": 0
+          }
+        },
+        "dormant": false,
+        "params": {
+          "waypoints": [
+            {
+              "x": 7.5,
+              "y": 18.5
+            },
+            {
+              "x": 32.5,
+              "y": 18.5
+            }
+          ]
+        },
+        "patrolIndex": 0
+      }
+    },
+    {
+      "id": 11,
+      "kind": "npc",
+      "archetype": "breacher",
+      "pos": {
+        "x": 13.5,
+        "y": 20.5
+      },
+      "prevPos": {
+        "x": 13.5,
+        "y": 20.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 62,
+        "max": 62,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "wrench",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "wrench",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "physical": 0.85,
+        "burning": 1.4
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "civ",
+        "home": {
+          "x": 13.5,
+          "y": 20.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "patrol",
+        "rel": {
+          "1": {
+            "hate": 0,
+            "fear": 0
+          }
+        },
+        "dormant": false,
+        "params": {
+          "waypoints": [
+            {
+              "x": 7.5,
+              "y": 20.5
+            },
+            {
+              "x": 32.5,
+              "y": 20.5
+            }
+          ]
+        },
+        "patrolIndex": 0
+      }
+    },
+    {
+      "id": 12,
+      "kind": "npc",
+      "archetype": "gloamhound",
+      "pos": {
+        "x": 18.5,
+        "y": 22.5
+      },
+      "prevPos": {
+        "x": 18.5,
+        "y": 22.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.2,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 32,
+        "max": 32,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fangs",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "fangs",
+            "qty": 20
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "spore": 0,
+        "poisoned": 0.6
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "civ",
+        "home": {
+          "x": 18.5,
+          "y": 22.5
+        },
+        "thinkAt": 0,
+        "sightRange": 10,
+        "behavior": "patrol",
+        "rel": {
+          "1": {
+            "hate": 0,
+            "fear": 0
+          }
+        },
+        "dormant": false,
+        "params": {
+          "waypoints": [
+            {
+              "x": 7.5,
+              "y": 22.5
+            },
+            {
+              "x": 32.5,
+              "y": 22.5
+            }
+          ]
+        },
+        "patrolIndex": 0
+      }
+    },
+    {
+      "id": 13,
+      "kind": "npc",
+      "archetype": "stalker",
+      "pos": {
+        "x": 23.5,
+        "y": 24.5
+      },
+      "prevPos": {
+        "x": 23.5,
+        "y": 24.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.2,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 30,
+        "max": 30,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fangs",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "fangs",
+            "qty": 20
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "poisoned": 0.4,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "civ",
+        "home": {
+          "x": 23.5,
+          "y": 24.5
+        },
+        "thinkAt": 0,
+        "sightRange": 10,
+        "behavior": "patrol",
+        "rel": {
+          "1": {
+            "hate": 0,
+            "fear": 0
+          }
+        },
+        "dormant": false,
+        "params": {
+          "waypoints": [
+            {
+              "x": 7.5,
+              "y": 24.5
+            },
+            {
+              "x": 32.5,
+              "y": 24.5
+            }
+          ]
+        },
+        "patrolIndex": 0
+      }
+    }
+  ],
+  "hostile": false
+}

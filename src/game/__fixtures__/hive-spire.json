@@ -1,0 +1,167 @@
+{
+  "v": 1,
+  "seed": 1106,
+  "floor": 1,
+  "tick": 0,
+  "nextId": 3,
+  "alarm": 0,
+  "gameOver": false,
+  "mission": {
+    "template": "reach",
+    "complete": true,
+    "exitUnlocked": true,
+    "description": "Reach the Launch Bay"
+  },
+  "noises": [],
+  "events": [],
+  "rng": 1735418831,
+  "baseRng": 1106,
+  "level": {
+    "rows": [
+      "##############################",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,~~~~~~~~~~~~~~~,,#",
+      "#,,,,,,,,,,,~~~~~~~~~~~~~~~,,#",
+      "#,,,,,,,,,,,~~,,,,,,,,,,,~~,,#",
+      "#,,,,,,,,,,,~~,,,,,,,,,,,~~,,#",
+      "#,,,,,.,,,,,~~,,,,,,,,,,,~~,,#",
+      "#,,,,,,,,,,,~~,,,,,,,,,,,~~,,#",
+      "#,,,,,,,,,,,~~,,,,,,,,,,,~~,,#",
+      "#,,,,,,,,,,,~~~~~~~~~~~~~~~,,#",
+      "#,,,,,,,,,,,~~~~~~~~~~~~~~~,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "##############################"
+    ],
+    "spawn": {
+      "x": 6.5,
+      "y": 8.5
+    },
+    "exit": {
+      "x": -1,
+      "y": -1
+    }
+  },
+  "entities": [
+    {
+      "id": 1,
+      "kind": "player",
+      "archetype": "player",
+      "pos": {
+        "x": 6.5,
+        "y": 8.5
+      },
+      "prevPos": {
+        "x": 6.5,
+        "y": 8.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.5,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 400,
+        "max": 400,
+        "iframes": 90
+      },
+      "combat": {
+        "weapon": "flamethrower",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "flamethrower",
+            "qty": 1,
+            "mods": []
+          }
+        ],
+        "activeSlot": 0
+      },
+      "playerCtl": {
+        "playerId": 0,
+        "abilityCooldown": 0,
+        "cash": 0,
+        "misdeedUntilTick": 0
+      }
+    },
+    {
+      "id": 2,
+      "kind": "npc",
+      "archetype": "hivespire",
+      "pos": {
+        "x": 19.5,
+        "y": 8.5
+      },
+      "prevPos": {
+        "x": 19.5,
+        "y": 8.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 120,
+        "max": 120,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "physical": 0.7,
+        "burning": 1.6,
+        "spore": 0,
+        "poisoned": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "neutral",
+        "home": {
+          "x": 19.5,
+          "y": 8.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "hive",
+        "guard": true
+      },
+      "hive": {
+        "nextSpawnAt": 60,
+        "nextSpreadAt": 900,
+        "children": []
+      }
+    }
+  ]
+}

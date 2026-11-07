@@ -1,0 +1,447 @@
+{
+  "v": 1,
+  "seed": 1106,
+  "floor": 1,
+  "tick": 0,
+  "nextId": 8,
+  "alarm": 0,
+  "gameOver": false,
+  "mission": {
+    "template": "reach",
+    "complete": true,
+    "exitUnlocked": true,
+    "description": "Reach the Launch Bay"
+  },
+  "noises": [],
+  "events": [],
+  "rng": 1735418831,
+  "baseRng": 1106,
+  "level": {
+    "rows": [
+      "##########################",
+      "#++++++++++++++++++++++++#",
+      "#++++++++++++++++++++++++#",
+      "#++++++++++++++++++++++++#",
+      "#++++++++++++++++++++++++#",
+      "#++++++++++++++++++++++++#",
+      "#++++++++++++++++++++++++#",
+      "#++++.+++++++++++++++++++#",
+      "#++++++++++++++++++++++++#",
+      "#++++++++++++++++++++++++#",
+      "#++++++++++++++++++++++++#",
+      "#++++++++++++++++++++++++#",
+      "#++++++++++++++++++++++++#",
+      "#++++++++++++++++++++++++#",
+      "##########################"
+    ],
+    "spawn": {
+      "x": 5.5,
+      "y": 7.5
+    },
+    "exit": {
+      "x": -1,
+      "y": -1
+    }
+  },
+  "entities": [
+    {
+      "id": 1,
+      "kind": "player",
+      "archetype": "player",
+      "pos": {
+        "x": 5.5,
+        "y": 7.5
+      },
+      "prevPos": {
+        "x": 5.5,
+        "y": 7.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.5,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 200,
+        "max": 200,
+        "iframes": 90
+      },
+      "combat": {
+        "weapon": "shotgun",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "shotgun",
+            "qty": 1,
+            "mods": [
+              {
+                "id": "heavy",
+                "stacks": 1
+              }
+            ]
+          }
+        ],
+        "activeSlot": 0
+      },
+      "playerCtl": {
+        "playerId": 0,
+        "abilityCooldown": 0,
+        "cash": 0,
+        "misdeedUntilTick": 0
+      }
+    },
+    {
+      "id": 2,
+      "kind": "npc",
+      "archetype": "mutant",
+      "pos": {
+        "x": 8.5,
+        "y": 5.5
+      },
+      "prevPos": {
+        "x": 8.5,
+        "y": 5.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.4,
+      "radius": 0.35,
+      "facing": 2.5535900500422257,
+      "health": {
+        "hp": 10,
+        "max": 40,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "wrench",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "wrench",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
+      },
+      "status": {
+        "stun": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0,
+        "sleep": 100000
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "rootcult",
+        "home": {
+          "x": 8.5,
+          "y": 5.5
+        },
+        "thinkAt": 0,
+        "sightRange": 7
+      }
+    },
+    {
+      "id": 3,
+      "kind": "npc",
+      "archetype": "mutant",
+      "pos": {
+        "x": 9.5,
+        "y": 7.5
+      },
+      "prevPos": {
+        "x": 9.5,
+        "y": 7.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.4,
+      "radius": 0.35,
+      "facing": 3.141592653589793,
+      "health": {
+        "hp": 10,
+        "max": 40,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "wrench",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "wrench",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
+      },
+      "status": {
+        "stun": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0,
+        "sleep": 100000
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "rootcult",
+        "home": {
+          "x": 9.5,
+          "y": 7.5
+        },
+        "thinkAt": 0,
+        "sightRange": 7
+      }
+    },
+    {
+      "id": 4,
+      "kind": "npc",
+      "archetype": "mutant",
+      "pos": {
+        "x": 8.5,
+        "y": 9.5
+      },
+      "prevPos": {
+        "x": 8.5,
+        "y": 9.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.4,
+      "radius": 0.35,
+      "facing": -2.5535900500422257,
+      "health": {
+        "hp": 10,
+        "max": 40,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "wrench",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "wrench",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
+      },
+      "status": {
+        "stun": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0,
+        "sleep": 100000
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "rootcult",
+        "home": {
+          "x": 8.5,
+          "y": 9.5
+        },
+        "thinkAt": 0,
+        "sightRange": 7
+      }
+    },
+    {
+      "id": 5,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 10.5,
+        "y": 4.5
+      },
+      "prevPos": {
+        "x": 10.5,
+        "y": 4.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": 2.601173153319209,
+      "health": {
+        "hp": 6,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0,
+        "sleep": 100000
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "rootcult",
+        "home": {
+          "x": 10.5,
+          "y": 4.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "vermin"
+      }
+    },
+    {
+      "id": 6,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 11.5,
+        "y": 8.5
+      },
+      "prevPos": {
+        "x": 11.5,
+        "y": 8.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": -2.976443976175166,
+      "health": {
+        "hp": 6,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0,
+        "sleep": 100000
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "rootcult",
+        "home": {
+          "x": 11.5,
+          "y": 8.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "vermin"
+      }
+    },
+    {
+      "id": 7,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 10.5,
+        "y": 11.5
+      },
+      "prevPos": {
+        "x": 10.5,
+        "y": 11.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": -2.4668517113662407,
+      "health": {
+        "hp": 6,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0,
+        "sleep": 100000
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "rootcult",
+        "home": {
+          "x": 10.5,
+          "y": 11.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "vermin"
+      }
+    }
+  ]
+}

@@ -1,0 +1,490 @@
+{
+  "v": 1,
+  "seed": 1106,
+  "floor": 1,
+  "tick": 0,
+  "nextId": 15,
+  "alarm": 0,
+  "gameOver": false,
+  "mission": {
+    "template": "reach",
+    "complete": true,
+    "exitUnlocked": true,
+    "description": "Reach the Launch Bay"
+  },
+  "noises": [],
+  "events": [],
+  "rng": 1735418831,
+  "baseRng": 1106,
+  "level": {
+    "rows": [
+      "################",
+      "#++++++++++++++#",
+      "#++++++++++++++#",
+      "#++++++++++++++#",
+      "#++++++++++++++#",
+      "#++++++++++++++#",
+      "#++++++++++++++#",
+      "#++++++++++++++#",
+      "#+++++++.++++++#",
+      "#++++++++++++++#",
+      "################"
+    ],
+    "spawn": {
+      "x": 8.5,
+      "y": 8.5
+    },
+    "exit": {
+      "x": -1,
+      "y": -1
+    }
+  },
+  "entities": [
+    {
+      "id": 1,
+      "kind": "player",
+      "archetype": "player",
+      "pos": {
+        "x": 8.5,
+        "y": 8.5
+      },
+      "prevPos": {
+        "x": 8.5,
+        "y": 8.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.5,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 120,
+        "max": 120,
+        "iframes": 90
+      },
+      "combat": {
+        "weapon": "pistol",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "pistol",
+            "qty": 1,
+            "mods": []
+          }
+        ],
+        "activeSlot": 0
+      },
+      "playerCtl": {
+        "playerId": 0,
+        "abilityCooldown": 0,
+        "cash": 0,
+        "misdeedUntilTick": 0
+      }
+    },
+    {
+      "id": 2,
+      "kind": "interactable",
+      "archetype": "vending",
+      "pos": {
+        "x": 2.5,
+        "y": 2.5
+      },
+      "prevPos": {
+        "x": 2.5,
+        "y": 2.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 40,
+        "max": 40,
+        "iframes": 0
+      },
+      "interact": {
+        "verb": "use",
+        "range": 1.3
+      }
+    },
+    {
+      "id": 3,
+      "kind": "interactable",
+      "archetype": "cryoTerminal",
+      "pos": {
+        "x": 4.5,
+        "y": 2.5
+      },
+      "prevPos": {
+        "x": 4.5,
+        "y": 2.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 30,
+        "max": 30,
+        "iframes": 0
+      },
+      "interact": {
+        "verb": "use",
+        "range": 1.3
+      }
+    },
+    {
+      "id": 4,
+      "kind": "interactable",
+      "archetype": "tv",
+      "pos": {
+        "x": 7.5,
+        "y": 2.5
+      },
+      "prevPos": {
+        "x": 7.5,
+        "y": 2.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 12,
+        "max": 12,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 5,
+      "kind": "interactable",
+      "archetype": "locker",
+      "pos": {
+        "x": 10.5,
+        "y": 2.5
+      },
+      "prevPos": {
+        "x": 10.5,
+        "y": 2.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 30,
+        "max": 30,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 6,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 12.5,
+        "y": 2.5
+      },
+      "prevPos": {
+        "x": 12.5,
+        "y": 2.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 7,
+      "kind": "interactable",
+      "archetype": "toilet",
+      "pos": {
+        "x": 2.5,
+        "y": 5.5
+      },
+      "prevPos": {
+        "x": 2.5,
+        "y": 5.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 8,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 6.5,
+        "y": 5.5
+      },
+      "prevPos": {
+        "x": 6.5,
+        "y": 5.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 9,
+      "kind": "interactable",
+      "archetype": "chair",
+      "pos": {
+        "x": 7.5,
+        "y": 5.5
+      },
+      "prevPos": {
+        "x": 7.5,
+        "y": 5.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 10,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 11.5,
+        "y": 5.5
+      },
+      "prevPos": {
+        "x": 11.5,
+        "y": 5.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 11,
+      "kind": "interactable",
+      "archetype": "barrel",
+      "pos": {
+        "x": 12.5,
+        "y": 5.5
+      },
+      "prevPos": {
+        "x": 12.5,
+        "y": 5.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 15,
+        "max": 15,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 12,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 3.5,
+        "y": 7.5
+      },
+      "prevPos": {
+        "x": 3.5,
+        "y": 7.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 13,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 4.5,
+        "y": 7.5
+      },
+      "prevPos": {
+        "x": 4.5,
+        "y": 7.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 14,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 12.5,
+        "y": 8.5
+      },
+      "prevPos": {
+        "x": 12.5,
+        "y": 8.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    }
+  ],
+  "hostile": false
+}

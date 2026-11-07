@@ -2,10 +2,9 @@ import type { Entity } from '../game/entity'
 import { modifierView } from '../game/floorModifiers'
 import { spawnPlayer } from '../game/player'
 import { playerSpawnPoint } from '../game/spawnPlacement'
-import { populateWorld } from '../game/populate'
-import { setupFloor } from '../game/systems/missions'
+import { startRun } from '../game/runStart'
 import { lockdownView } from '../game/systems/alarm'
-import { createWorld, stationAlerted, tickWorld, type RunMode, type World } from '../game/world'
+import { stationAlerted, tickWorld, type RunMode, type World } from '../game/world'
 import type { InputCmd } from '../game/types'
 import type { InputSource } from '../input/input'
 import type { CoopSample } from '../input/gamepadCoop'
@@ -111,11 +110,9 @@ export class HostSession implements Session {
    * and by restart() — a fresh run from default state. */
   private buildRun(): void {
     this.runEpoch++
-    this.world = createWorld(this.seed, 1, this.mode)
-    populateWorld(this.world)
-    setupFloor(this.world)
-    const at = playerSpawnPoint(this.world.level, 0)
-    this.self = spawnPlayer(this.world, 0, at.x, at.y)
+    const { world, self } = startRun(this.seed, this.mode)
+    this.world = world
+    this.self = self
   }
 
   /** Play again from a game-over: rebuild the run in place. (Solo has no

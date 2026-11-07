@@ -2,6 +2,7 @@ import { APP_VERSION, otaBundleVersion } from '../app/version'
 import { markUiChrome } from './chrome'
 import { formatReleaseNotes } from './releaseNotes'
 import { installGamepadMenuNav } from './gamepadMenu'
+import { openTestScenarios } from './testScenarios'
 
 export type GameMode = 'solo' | 'host' | 'join' | 'online'
 
@@ -79,6 +80,8 @@ export const pickMode = (
   mount: HTMLElement,
   onPick?: (mode: GameMode) => void,
   settings?: SettingsControl,
+  /** `openScenarios`: open the Test scenarios page at once (back from one). */
+  opts: { openScenarios?: boolean } = {},
 ): Promise<GameMode> =>
   new Promise((resolve) => {
     installStartMenuStyle()
@@ -126,10 +129,30 @@ export const pickMode = (
       b.dataset.role = 'menu-settings'
       b.addEventListener('click', () => settings.open())
     }
+    // Test scenarios: a page of playable moments over the menu. Every player
+    // sees it (no ?debug): the owner tests on his phone. Like Settings it does
+    // not resolve the mode; Back lands on this menu again.
+    let scenariosOpen = false
+    const scenariosBtn = menuButton(blurbed('Test scenarios', 'Jump straight into new stuff'))
+    scenariosBtn.dataset.role = 'menu-test-scenarios'
+    const showScenarios = (): void => {
+      if (scenariosOpen) return
+      scenariosOpen = true
+      openTestScenarios(overlay, {
+        onClose: () => {
+          scenariosOpen = false
+          if (location.hash) history.replaceState(null, '', location.pathname + location.search)
+          scenariosBtn.focus()
+        },
+      })
+    }
+    scenariosBtn.addEventListener('click', showScenarios)
     // Controller support: a gamepad-only player can move focus + confirm here.
     // Suppressed while the settings panel is open — the panel runs its own
     // navigator, and two live navigators would both react to every press.
-    stopNav = installGamepadMenuNav(() => navButtons, { suppress: () => settings?.isOpen() ?? false })
+    stopNav = installGamepadMenuNav(() => navButtons, {
+      suppress: () => scenariosOpen || (settings?.isOpen() ?? false),
+    })
     // Big version readout under the mode picker so you can tell at a glance which
     // build a phone is on (esp. after an OTA update) before starting a game.
     const ver = document.createElement('div')
@@ -154,6 +177,7 @@ export const pickMode = (
       inner.appendChild(notesBox)
     }
     mount.appendChild(overlay)
+    if (opts.openScenarios) showScenarios()
   })
 
 export type JoinTransportChoice = 'ble' | 'tabs'

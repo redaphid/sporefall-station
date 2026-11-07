@@ -20,6 +20,14 @@ export interface BotPlan {
   /** Press use on any of these entities while within reach of it, and wait
    * there until it has been used. */
   use?: readonly number[]
+  /** Hold fire before this sim tick (still aims). */
+  fireFrom?: number
+  /** Press Use/Throw on these sim ticks, aimed at the current target: a held
+   * grenade is thrown. */
+  throwAt?: readonly number[]
+  /** Stand still this many ticks on reaching each route point before the next
+   * leg: a run that stops dead at every corner. */
+  dwell?: number
 }
 
 const player = (w: World): Entity | undefined => w.entities.find((e) => e.playerCtl && !e.dead)
@@ -48,6 +56,7 @@ const pickTarget = (w: World, me: Entity, plan: BotPlan): Entity | undefined => 
 /** A bot for one run: it remembers how far along its route it has walked. */
 export const makeBot = (plan: BotPlan): ((w: World) => InputCmd) => {
   let leg = 0
+  let arrivedAt = -1
   return (w) => {
     const cmd = { ...emptyInput(), seq: w.tick }
     const me = player(w)
@@ -59,8 +68,9 @@ export const makeBot = (plan: BotPlan): ((w: World) => InputCmd) => {
       const len = Math.hypot(dx, dy) || 1
       cmd.aimX = dx / len
       cmd.aimY = dy / len
-      cmd.attack = true
+      cmd.attack = w.tick >= (plan.fireFrom ?? 0)
     }
+    cmd.throwItem = plan.throwAt?.includes(w.tick) ?? false
     const usable = (plan.use ?? []).some((id) => {
       const e = w.byId.get(id)
       return e && !e.dead && !(e.door ? e.door.open : e.used) && Math.hypot(e.pos.x - me.pos.x, e.pos.y - me.pos.y) < 1.2
@@ -69,7 +79,14 @@ export const makeBot = (plan: BotPlan): ((w: World) => InputCmd) => {
     cmd.interact = usable && w.tick % 2 === 0
     const route = plan.route ?? []
     // Beside something still to use, hold the leg until it has been used.
-    while (!usable && leg < route.length - 1 && Math.hypot(route[leg].x - me.pos.x, route[leg].y - me.pos.y) < 0.6) leg++
+    while (!usable && leg < route.length - 1 && Math.hypot(route[leg].x - me.pos.x, route[leg].y - me.pos.y) < 0.6) {
+      if (plan.dwell) {
+        if (arrivedAt < 0) arrivedAt = w.tick
+        if (w.tick - arrivedAt < plan.dwell) return cmd
+        arrivedAt = -1
+      }
+      leg++
+    }
     const goal = route[leg]
     if (goal) {
       const dx = goal.x - me.pos.x

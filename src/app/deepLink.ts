@@ -27,6 +27,8 @@ export interface DeepLink {
   readonly scenario: string | null
   readonly state: string | null
   readonly world: string | null
+  /** A playable scenario from the Test scenarios list (src/playable). */
+  readonly play: string | null
   readonly script: string | null
   /** The seed the run will use; `0` or non-numeric means "roll one". */
   readonly seed: number | null
@@ -36,6 +38,7 @@ export const readDeepLink = (params: URLSearchParams): DeepLink => ({
   scenario: params.get('scenario') || null,
   state: params.get('state') || null,
   world: params.get('world') || null,
+  play: params.get('play') || null,
   script: params.get('script') || null,
   seed: Number(params.get('seed')) || null,
 })
@@ -48,6 +51,7 @@ export const overridesSave = (link: DeepLink): boolean =>
   link.scenario !== null ||
   link.state !== null ||
   link.world !== null ||
+  link.play !== null ||
   link.script !== null ||
   link.seed !== null
 
@@ -58,7 +62,7 @@ export const overridesSave = (link: DeepLink): boolean =>
  * excluded too: every build can start any seed.
  */
 export const wantsFreshBuild = (link: DeepLink): boolean =>
-  link.scenario !== null || link.state !== null || link.world !== null
+  link.scenario !== null || link.state !== null || link.world !== null || link.play !== null
 
 /**
  * The autosave only ever tracks a run the player started themselves. A run a
@@ -91,3 +95,9 @@ export const unknownWorldMessage = (name: string, scenes: readonly string[], ver
   `No saved world named "${name}" in this build (${version}), so nothing was loaded and your saved run is untouched. ` +
   `If it is new, this copy of the game may be out of date: reload once while online. ` +
   `Scenes you can open: ${scenes.join(', ')} (or browse them at scenes.html).`
+
+/** The visible error for a `?play=` scenario this build does not carry. */
+export const unknownPlayMessage = (id: string, known: readonly string[], version: string): string =>
+  `No test scenario named "${id}" in this build (${version}), so nothing was loaded and your saved run is untouched. ` +
+  `If it is new, this copy of the game may be out of date: reload once while online. ` +
+  `Test scenarios here: ${known.join(', ')}.`

@@ -4,7 +4,7 @@ import { arm, asleep, npc, room, save, stage } from './lib.mts'
 
 const rows = room(26, 15, 5, 7, '+').rows
 const { w, p } = stage(rows, { hp: 200 })
-arm(p, 'shotgun', [{ id: 'heavy', stacks: 1 }])
+arm(p, 'scatterFunnel', [{ id: 'heavy', stacks: 1 }])
 const px = p.pos.x
 const py = p.pos.y
 for (const [x, y] of [

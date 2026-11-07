@@ -5,20 +5,22 @@ import { assignPatrol } from '../../src/game/populate'
 import { arm, npc, room, save, stage } from './lib.mts'
 
 const CAST = ['robot', 'mutant', 'lurker', 'brute', 'bellwether', 'cinder', 'sporeling', 'drowner', 'mender', 'breacher', 'gloamhound', 'stalker']
-const rows = room(36, 2 * CAST.length + 5, 3, CAST.length + 2, ',').rows
+// Two columns of six lanes, so the whole parade fits one phone screen.
+const rows = room(36, 16, 18, 8, '+').rows
 const { w, p } = stage(rows, { hostile: false })
-arm(p, 'pistol', [])
+arm(p, 'rivetDriver', [])
 CAST.forEach((arch, i) => {
-  const y = 2 + 2 * i
-  const e: Entity = npc(w, arch, 8 + ((i * 5) % 20), y)
+  const y = 3 + 2 * (i % 6)
+  const [x0, x1] = i < 6 ? [3.5, 15.5] : [20.5, 32.5]
+  const e: Entity = npc(w, arch, Math.floor(x0) + 2 + ((i * 3) % 8), y)
   // A peaceful parade: no grudge against players, no group to rally to.
   e.ai!.faction = 'civ'
   e.ai!.rel = { [p.id]: { hate: 0, fear: 0 } as never }
   e.ai!.dormant = false // the lurker would otherwise crouch in wait
   e.ai!.wakeOn = undefined
   assignPatrol(e, [
-    { x: 7.5, y: y + 0.5 },
-    { x: 32.5, y: y + 0.5 },
+    { x: x0, y: y + 0.5 },
+    { x: x1, y: y + 0.5 },
   ])
 })
 save('cast-parade', w)

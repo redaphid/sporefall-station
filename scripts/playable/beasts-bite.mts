@@ -5,7 +5,7 @@ import { arm, npc, room, save, stage } from './lib.mts'
 
 const rows = room(30, 18, 5, 9, ',').rows
 const { w, p } = stage(rows, { hp: 500 })
-arm(p, 'shotgun', [])
+arm(p, 'scatterFunnel', [])
 spawnPack(w, { x: 12.5, y: 6.5 }, 3)
 npc(w, 'stalker', 12, 12)
 npc(w, 'stalker', 14, 13)

@@ -8,7 +8,7 @@ const rows = room(38, 13, 10, 6, '%')
   .fill(12, 3, 12, 4, '#')
   .fill(12, 8, 12, 9, '#').rows
 const { w, p } = stage(rows, { hp: 240 })
-arm(p, 'pistol', [])
+arm(p, 'rivetDriver', [])
 for (const [x, y] of [
   [29, 4],
   [31, 6],

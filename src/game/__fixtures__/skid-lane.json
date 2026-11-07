@@ -82,7 +82,7 @@
         "iframes": 90
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "status": {
@@ -94,7 +94,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "rivetDriver",
             "qty": 1,
             "mods": []
           }

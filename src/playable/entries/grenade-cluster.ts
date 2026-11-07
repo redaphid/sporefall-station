@@ -9,6 +9,6 @@ export default {
   section: 'new',
   tags: ['grenade', 'death tumble', 'explosion'],
   start: { kind: 'fixture', fixture: 'grenade-cluster' },
-  shot: { tick: 53, zoom: 1.6 },
+  shot: { tick: 51, zoom: 1.3 },
   demo: { throwAt: [30], fireFrom: 100000 },
 } satisfies Playable

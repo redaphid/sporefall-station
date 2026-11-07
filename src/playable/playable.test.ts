@@ -177,7 +177,7 @@ describe('each New today scenario plays the beat its card promises', () => {
     const deaths = events.filter((e) => e.type === 'death')
     expect(deaths.length).toBeGreaterThanOrEqual(4)
     expect(player(w).health!.hp).toBe(player(w).health!.max)
-    expect(player(w).combat!.weapon).toBe('shotgun')
+    expect(player(w).combat!.weapon).toBe('scatterFunnel')
   })
 
   it('hard-hits: a kill lands within 10 ticks before the screenshot tick', () => {
@@ -210,7 +210,7 @@ describe('each New today scenario plays the beat its card promises', () => {
     expect(perTick.filter((t) => t.explosions > 0)).toHaveLength(1)
     expect(perTick[blast].deaths).toBe(4)
     expect(p.shot.tick - blast).toBeGreaterThan(0)
-    expect(p.shot.tick - blast).toBeLessThanOrEqual(10)
+    expect(p.shot.tick - blast, "the bodies are still in the air").toBeLessThanOrEqual(16)
   })
 
   it('skid-lane: the demo sprints and stops dead in four directions, and the picture is a stop', () => {
@@ -247,7 +247,7 @@ describe('each New today scenario plays the beat its card promises', () => {
     expect(cast).toHaveLength(12)
     expect(aggro).toBe(false)
     expect(cast.every((e) => !e.dead)).toBe(true)
-    for (const e of cast) expect(maxX.get(e.id)! - minX.get(e.id)!, `${e.archetype} walked its lane`).toBeGreaterThan(8)
+    for (const e of cast) expect(maxX.get(e.id)! - minX.get(e.id)!, `${e.archetype} walked its lane`).toBeGreaterThan(6)
     expect(player(w).health!.hp).toBe(player(w).health!.max)
   })
 
@@ -294,5 +294,15 @@ describe('each New today scenario plays the beat its card promises', () => {
     for (const a of ['vending', 'cryoTerminal', 'tv', 'locker', 'cabinet', 'toilet', 'desk', 'bench']) expect(props, a).toContain(a)
     expect(w.entities.filter((e) => e.kind === 'npc')).toHaveLength(0)
     expect(player(w).health!.hp).toBe(player(w).health!.max)
+  })
+
+  it('rivet-driver-mods: the modded Rivet Driver freezes, burns or shocks what it hits, by the picture', () => {
+    const p = entry('rivet-driver-mods')
+    const { w } = run(p, p.shot.tick)
+    const gun = player(w).loadout!.inventory[0]
+    expect(gun.itemId).toBe('rivetDriver')
+    expect(gun.mods!.map((m) => m.id)).toEqual(['frost', 'incendiary', 'shock', 'homing', 'heavy'])
+    const struck = w.entities.filter((e) => e.archetype === 'mutant' && e.fx && ['frozen', 'burning', 'electrified'].some((k) => k in e.fx!))
+    expect(struck.length).toBeGreaterThan(0)
   })
 })

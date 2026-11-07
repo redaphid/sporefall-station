@@ -69,7 +69,7 @@
         "iframes": 90
       },
       "combat": {
-        "weapon": "shotgun",
+        "weapon": "scatterFunnel",
         "cooldown": 0
       },
       "status": {
@@ -81,7 +81,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "shotgun",
+            "itemId": "scatterFunnel",
             "qty": 1,
             "mods": [
               {
@@ -129,13 +129,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -187,13 +187,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -245,13 +245,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],

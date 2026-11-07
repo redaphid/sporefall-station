@@ -4,7 +4,7 @@ import { arm, asleep, npc, room, save, stage } from './lib.mts'
 
 const rows = room(24, 13, 4, 6, '.').rows
 const { w, p } = stage(rows, { hp: 200 })
-arm(p, 'pistol', [])
+arm(p, 'rivetDriver', [])
 p.loadout!.inventory.push({ itemId: 'grenade', qty: 6 })
 p.loadout!.activeSlot = 1
 const hx = 10.5

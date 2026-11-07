@@ -9,6 +9,6 @@ export default {
   section: 'new',
   tags: ['walk cycles', 'cast', 'peaceful'],
   start: { kind: 'fixture', fixture: 'cast-parade' },
-  shot: { tick: 90, zoom: 1 },
+  shot: { tick: 90, zoom: 0.8 },
   demo: { range: 0 },
 } satisfies Playable

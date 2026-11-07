@@ -9,5 +9,5 @@ export default {
   section: 'new',
   tags: ['props', 'art', 'peaceful'],
   start: { kind: 'fixture', fixture: 'props-room' },
-  shot: { tick: 10, zoom: 2 },
+  shot: { tick: 10, zoom: 1.5 },
 } satisfies Playable

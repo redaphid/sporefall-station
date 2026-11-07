@@ -75,7 +75,7 @@
         "iframes": 90
       },
       "combat": {
-        "weapon": "flamethrower",
+        "weapon": "phosphorHose",
         "cooldown": 0
       },
       "status": {
@@ -87,7 +87,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "flamethrower",
+            "itemId": "phosphorHose",
             "qty": 1,
             "mods": []
           }
